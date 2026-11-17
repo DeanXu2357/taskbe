@@ -41,7 +41,7 @@ func TestCreateNameRules(t *testing.T) {
 
 		_, err := svc.Create(context.Background(), service.CreateInput{Name: tc.in})
 
-		if err != tc.wantErr {
+		if !errors.Is(err, tc.wantErr) {
 			t.Errorf("%q: err = %v, want %v", tc.in, err, tc.wantErr)
 			continue
 		}
@@ -95,7 +95,7 @@ func TestCreateValidation(t *testing.T) {
 
 		_, err := svc.Create(context.Background(), tc.in)
 
-		if err != tc.wantErr {
+		if !errors.Is(err, tc.wantErr) {
 			t.Errorf("case %d: err = %v, want %v", i, err, tc.wantErr)
 		}
 	}
@@ -132,7 +132,7 @@ func TestReplaceValidation(t *testing.T) {
 		wantErr error
 	}{
 		{service.ReplaceInput{Name: " ", Status: task.StatusCompleted}, task.ErrNameEmpty},
-		{service.ReplaceInput{Name: strings.Repeat("字", task.MaxNameLength+1), Status: task.StatusCompleted}, task.ErrNameTooLong},
+		{service.ReplaceInput{Name: strings.Repeat("字", 201), Status: task.StatusCompleted}, task.ErrNameTooLong},
 		{service.ReplaceInput{Name: "a", Status: task.Status(2)}, task.ErrInvalidStatus},
 	}
 	for i, tc := range cases {
@@ -140,7 +140,7 @@ func TestReplaceValidation(t *testing.T) {
 
 		_, err := svc.Replace(context.Background(), 1, 1, tc.in)
 
-		if err != tc.wantErr {
+		if !errors.Is(err, tc.wantErr) {
 			t.Errorf("case %d: err = %v, want %v", i, err, tc.wantErr)
 		}
 	}
@@ -306,7 +306,7 @@ func TestListValidation(t *testing.T) {
 
 		_, err := svc.List(context.Background(), tc.p)
 
-		if err != tc.wantErr {
+		if !errors.Is(err, tc.wantErr) {
 			t.Errorf("%+v: err = %v, want %v", tc.p, err, tc.wantErr)
 		}
 	}

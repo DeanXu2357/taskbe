@@ -11,9 +11,11 @@ import (
 	"github.com/DeanXu2357/taskbe/internal/task"
 )
 
+const DefaultPageSize = 20
+
 const (
-	DefaultPageSize = 20
-	MaxPageSize     = 100
+	maxPageSize   = 100
+	maxNameLength = 200
 )
 
 type Service struct {
@@ -46,8 +48,8 @@ type Page struct {
 }
 
 func (s *Service) List(ctx context.Context, p ListParams) (Page, error) {
-	if p.Limit < 1 || p.Limit > MaxPageSize {
-		return Page{}, task.ErrInvalidLimit
+	if p.Limit < 1 || p.Limit > maxPageSize {
+		return Page{}, fmt.Errorf("%w (must be between 1 and %d)", task.ErrInvalidLimit, maxPageSize)
 	}
 	if p.AfterID < 0 {
 		return Page{}, task.ErrInvalidCursor
@@ -125,8 +127,8 @@ func normalizeName(name string) (string, error) {
 	if name == "" {
 		return "", task.ErrNameEmpty
 	}
-	if utf8.RuneCountInString(name) > task.MaxNameLength {
-		return "", task.ErrNameTooLong
+	if utf8.RuneCountInString(name) > maxNameLength {
+		return "", fmt.Errorf("%w (at most %d characters)", task.ErrNameTooLong, maxNameLength)
 	}
 	return name, nil
 }

@@ -25,15 +25,13 @@ type Task struct {
 	UpdatedAt time.Time
 }
 
-const MaxNameLength = 200
-
 var (
 	ErrNotFound        = errors.New("task not found")
 	ErrNameEmpty       = errors.New("name must not be empty")
-	ErrNameTooLong     = errors.New("name must be at most 200 characters")
+	ErrNameTooLong     = errors.New("name is too long")
 	ErrInvalidStatus   = errors.New("status must be 0 or 1")
 	ErrVersionConflict = errors.New("task was modified by another request")
-	ErrInvalidLimit    = errors.New("limit must be between 1 and 100")
+	ErrInvalidLimit    = errors.New("limit is out of range")
 	ErrInvalidCursor   = errors.New("cursor is invalid")
 	ErrUnexpected      = errors.New("unexpected error")
 )
