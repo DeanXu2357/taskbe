@@ -2,7 +2,10 @@ package logx
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"strconv"
+	"unicode"
 )
 
 // Logger matches the method set of *slog.Logger, so a *slog.Logger can be injected once the minimum Go version allows it.
@@ -36,5 +39,23 @@ func (s *StdLogger) WarnContext(_ context.Context, msg string, args ...any)  { s
 func (s *StdLogger) ErrorContext(_ context.Context, msg string, args ...any) { s.Error(msg, args...) }
 
 func (s *StdLogger) print(level, msg string, args []any) {
-	s.l.Println(append([]any{level, msg}, args...)...)
+	parts := make([]any, 0, len(args)+2)
+	parts = append(parts, level, msg)
+	for _, a := range args {
+		parts = append(parts, quoteIfNeeded(fmt.Sprint(a)))
+	}
+	s.l.Println(parts...)
+}
+
+// quoteIfNeeded quotes like slog's text handler, so a value such as a request path cannot start a fake log line.
+func quoteIfNeeded(s string) string {
+	if s == "" {
+		return `""`
+	}
+	for _, r := range s {
+		if r == ' ' || r == '=' || r == '"' || !unicode.IsPrint(r) {
+			return strconv.Quote(s)
+		}
+	}
+	return s
 }
