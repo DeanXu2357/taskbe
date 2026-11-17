@@ -4,13 +4,12 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-GO_VERSION="${GO_VERSION:-1.27.4}"
-image="task-api:smoke-go${GO_VERSION}"
+image="task-api:smoke-go${GO_VERSION:-default}"
 container="task-api-smoke-$$"
 
 trap 'docker rm -f "$container" >/dev/null 2>&1 || true' EXIT
 
-docker build --build-arg GO_VERSION="$GO_VERSION" -t "$image" .
+docker build ${GO_VERSION:+--build-arg "GO_VERSION=$GO_VERSION"} -t "$image" .
 docker run -d --name "$container" -p 127.0.0.1::8080 "$image" >/dev/null
 base="http://$(docker port "$container" 8080/tcp | head -n 1)"
 

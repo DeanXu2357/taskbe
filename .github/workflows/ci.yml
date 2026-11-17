@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: test (go ${{ matrix.go }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        go: ['1.18', 'stable']
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ matrix.go }}
+          cache: false
+      - name: gofmt
+        # gofmt changed its doc comment formatting in Go 1.19, so only the current toolchain is authoritative.
+        if: matrix.go == 'stable'
+        run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
+      - run: go vet ./...
+      - run: go test -race -cover ./...
+
+  smoke:
+    name: smoke (go ${{ matrix.go || 'default' }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        go: ['', '1.18']
+    steps:
+      - uses: actions/checkout@v7
+      - run: scripts/smoke.sh
+        env:
+          GO_VERSION: ${{ matrix.go }}
