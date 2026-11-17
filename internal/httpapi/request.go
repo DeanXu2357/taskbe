@@ -20,8 +20,9 @@ type requestError struct {
 }
 
 type createTaskRequest struct {
-	Name   *string      `json:"name"`
-	Status *task.Status `json:"status"`
+	Name *string `json:"name"`
+	// An omitted or null status leaves the zero value, StatusIncomplete, which is the documented default.
+	Status task.Status `json:"status"`
 }
 
 type replaceTaskRequest struct {

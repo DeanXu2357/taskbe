@@ -53,23 +53,19 @@ func TestCreateTask(t *testing.T) {
 	}
 	assertBody(t, rec.Body.String(),
 		`{"data":{"id":1,"name":"買早餐","status":0,"version":1,"created_at":"2026-11-17T08:00:00Z","updated_at":"2026-11-17T08:00:00Z"}}`)
-	if got.Name == nil || *got.Name != "買早餐" || got.Status != nil {
-		t.Errorf("service got Name=%v Status=%v, want 買早餐 and nil", got.Name, got.Status)
+	if want := (service.CreateInput{Name: "買早餐", Status: task.StatusIncomplete}); got != want {
+		t.Errorf("service got %+v, want %+v", got, want)
 	}
 }
 
 func TestCreateTaskDecodesInput(t *testing.T) {
-	one := task.StatusCompleted
-	name := "a"
 	cases := []struct {
-		body       string
-		wantName   *string
-		wantStatus *task.Status
+		body string
+		want service.CreateInput
 	}{
-		{`{"name":"a","status":1}`, &name, &one},
-		{`{"name":"a","status":null}`, &name, nil},
-		{`{"name":"a","foo":1}`, &name, nil},
-		{`null`, nil, nil},
+		{`{"name":"a","status":1}`, service.CreateInput{Name: "a", Status: task.StatusCompleted}},
+		{`{"name":"a","status":null}`, service.CreateInput{Name: "a", Status: task.StatusIncomplete}},
+		{`{"name":"a","foo":1}`, service.CreateInput{Name: "a", Status: task.StatusIncomplete}},
 	}
 	for _, tc := range cases {
 		var got service.CreateInput
@@ -87,8 +83,34 @@ func TestCreateTaskDecodesInput(t *testing.T) {
 			t.Errorf("%s: status = %d, want 201", tc.body, rec.Code)
 			continue
 		}
-		if !equalPtr(got.Name, tc.wantName) || !equalPtr(got.Status, tc.wantStatus) {
-			t.Errorf("%s: service got Name=%v Status=%v", tc.body, got.Name, got.Status)
+		if got != tc.want {
+			t.Errorf("%s: service got %+v, want %+v", tc.body, got, tc.want)
+		}
+	}
+}
+
+func TestCreateTaskRequiresName(t *testing.T) {
+	for _, body := range []string{`{}`, `{"status":1}`, `{"name":null}`, `null`} {
+		called := false
+		mux := http.NewServeMux()
+		httpapi.Register(mux, &fakeService{
+			create: func(context.Context, service.CreateInput) (task.Task, error) {
+				called = true
+				return task.Task{}, nil
+			},
+		}, discardLogger)
+
+		rec := do(mux, http.MethodPost, "/tasks", body)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("%s: status = %d, want 400", body, rec.Code)
+			continue
+		}
+		if code := decodeError(t, rec).Error.Code; code != "validation_failed" {
+			t.Errorf("%s: code = %q, want validation_failed", body, code)
+		}
+		if called {
+			t.Errorf("%s: service was called", body)
 		}
 	}
 }
@@ -149,7 +171,6 @@ func TestCreateTaskServiceErrors(t *testing.T) {
 		wantStatus int
 		wantCode   string
 	}{
-		{task.ErrNameRequired, http.StatusBadRequest, "validation_failed"},
 		{task.ErrNameEmpty, http.StatusBadRequest, "validation_failed"},
 		{task.ErrNameTooLong, http.StatusBadRequest, "validation_failed"},
 		{task.ErrInvalidStatus, http.StatusBadRequest, "validation_failed"},
@@ -321,11 +342,4 @@ func TestListRejectsQuery(t *testing.T) {
 			t.Errorf("%s: service was called", q)
 		}
 	}
-}
-
-func equalPtr[T comparable](a, b *T) bool {
-	if a == nil || b == nil {
-		return a == b
-	}
-	return *a == *b
 }

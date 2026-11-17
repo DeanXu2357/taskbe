@@ -66,12 +66,12 @@ func TestGetTaskServiceErrors(t *testing.T) {
 }
 
 func TestReplaceTask(t *testing.T) {
-	var gotID int64
+	var gotID, gotVersion int64
 	var got service.ReplaceInput
 	mux := http.NewServeMux()
 	httpapi.Register(mux, &fakeService{
-		replace: func(_ context.Context, id int64, in service.ReplaceInput) (task.Task, error) {
-			gotID, got = id, in
+		replace: func(_ context.Context, id, expectedVersion int64, in service.ReplaceInput) (task.Task, error) {
+			gotID, gotVersion, got = id, expectedVersion, in
 			return task.Task{ID: 1, Name: "買午餐", Status: task.StatusCompleted, Version: 4, CreatedAt: t0, UpdatedAt: t0.Add(time.Second)}, nil
 		},
 	}, discardLogger)
@@ -81,12 +81,9 @@ func TestReplaceTask(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", rec.Code)
 	}
-	if gotID != 1 {
-		t.Errorf("service got id %d, want 1", gotID)
-	}
-	name, one, version := "買午餐", task.StatusCompleted, int64(3)
-	if !equalPtr(got.Name, &name) || !equalPtr(got.Status, &one) || !equalPtr(got.Version, &version) {
-		t.Errorf("service got Name=%v Status=%v Version=%v, want 買午餐, 1 and 3", got.Name, got.Status, got.Version)
+	want := service.ReplaceInput{Name: "買午餐", Status: task.StatusCompleted}
+	if gotID != 1 || gotVersion != 3 || got != want {
+		t.Errorf("service got id %d, version %d, input %+v; want 1, 3, %+v", gotID, gotVersion, got, want)
 	}
 	assertBody(t, rec.Body.String(),
 		`{"data":{"id":1,"name":"買午餐","status":1,"version":4,"created_at":"2026-11-17T08:00:00Z","updated_at":"2026-11-17T08:00:01Z"}}`)
@@ -106,7 +103,7 @@ func TestReplaceTaskBodyID(t *testing.T) {
 		called := false
 		mux := http.NewServeMux()
 		httpapi.Register(mux, &fakeService{
-			replace: func(context.Context, int64, service.ReplaceInput) (task.Task, error) {
+			replace: func(context.Context, int64, int64, service.ReplaceInput) (task.Task, error) {
 				called = true
 				return task.Task{ID: 1, Name: "a", Status: task.StatusCompleted, CreatedAt: t0, UpdatedAt: t0}, nil
 			},
@@ -129,32 +126,36 @@ func TestReplaceTaskBodyID(t *testing.T) {
 	}
 }
 
-func TestReplaceTaskDecodesInput(t *testing.T) {
-	name, one, two := "a", task.StatusCompleted, int64(2)
-	cases := []struct {
-		body        string
-		wantName    *string
-		wantStatus  *task.Status
-		wantVersion *int64
-	}{
-		{`{"name":"a"}`, &name, nil, nil},
-		{`{"status":1}`, nil, &one, nil},
-		{`{"version":2}`, nil, nil, &two},
+func TestReplaceTaskRequiresFields(t *testing.T) {
+	bodies := []string{
+		`{"status":1,"version":1}`,
+		`{"name":null,"status":1,"version":1}`,
+		`{"name":"a","version":1}`,
+		`{"name":"a","status":null,"version":1}`,
+		`{"name":"a","status":1}`,
+		`{"name":"a","status":1,"version":null}`,
 	}
-	for _, tc := range cases {
-		var got service.ReplaceInput
+	for _, body := range bodies {
+		called := false
 		mux := http.NewServeMux()
 		httpapi.Register(mux, &fakeService{
-			replace: func(_ context.Context, _ int64, in service.ReplaceInput) (task.Task, error) {
-				got = in
-				return task.Task{ID: 1}, nil
+			replace: func(context.Context, int64, int64, service.ReplaceInput) (task.Task, error) {
+				called = true
+				return task.Task{}, nil
 			},
 		}, discardLogger)
 
-		do(mux, http.MethodPut, "/tasks/1", tc.body)
+		rec := do(mux, http.MethodPut, "/tasks/1", body)
 
-		if !equalPtr(got.Name, tc.wantName) || !equalPtr(got.Status, tc.wantStatus) || !equalPtr(got.Version, tc.wantVersion) {
-			t.Errorf("%s: service got Name=%v Status=%v Version=%v", tc.body, got.Name, got.Status, got.Version)
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("%s: status = %d, want 400", body, rec.Code)
+			continue
+		}
+		if code := decodeError(t, rec).Error.Code; code != "validation_failed" {
+			t.Errorf("%s: code = %q, want validation_failed", body, code)
+		}
+		if called {
+			t.Errorf("%s: service was called", body)
 		}
 	}
 }
@@ -163,7 +164,7 @@ func TestReplaceTaskRejectsBody(t *testing.T) {
 	called := false
 	mux := http.NewServeMux()
 	httpapi.Register(mux, &fakeService{
-		replace: func(context.Context, int64, service.ReplaceInput) (task.Task, error) {
+		replace: func(context.Context, int64, int64, service.ReplaceInput) (task.Task, error) {
 			called = true
 			return task.Task{}, nil
 		},
@@ -188,12 +189,9 @@ func TestReplaceTaskServiceErrors(t *testing.T) {
 		wantStatus int
 		wantCode   string
 	}{
-		{task.ErrNameRequired, http.StatusBadRequest, "validation_failed"},
 		{task.ErrNameEmpty, http.StatusBadRequest, "validation_failed"},
 		{task.ErrNameTooLong, http.StatusBadRequest, "validation_failed"},
-		{task.ErrStatusRequired, http.StatusBadRequest, "validation_failed"},
 		{task.ErrInvalidStatus, http.StatusBadRequest, "validation_failed"},
-		{task.ErrVersionRequired, http.StatusBadRequest, "validation_failed"},
 		{task.ErrVersionConflict, http.StatusConflict, "conflict"},
 		{task.ErrNotFound, http.StatusNotFound, "not_found"},
 		{fmt.Errorf("%w: boom", task.ErrUnexpected), http.StatusInternalServerError, "internal_error"},
@@ -204,7 +202,7 @@ func TestReplaceTaskServiceErrors(t *testing.T) {
 		t.Run(err.Error(), func(t *testing.T) {
 			mux := http.NewServeMux()
 			httpapi.Register(mux, &fakeService{
-				replace: func(context.Context, int64, service.ReplaceInput) (task.Task, error) {
+				replace: func(context.Context, int64, int64, service.ReplaceInput) (task.Task, error) {
 					return task.Task{}, err
 				},
 			}, discardLogger)

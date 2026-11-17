@@ -26,14 +26,13 @@ func New(store Store, now func() time.Time) *Service {
 }
 
 type CreateInput struct {
-	Name   *string
-	Status *task.Status
+	Name   string
+	Status task.Status
 }
 
 type ReplaceInput struct {
-	Name    *string
-	Status  *task.Status
-	Version *int64
+	Name   string
+	Status task.Status
 }
 
 type ListParams struct {
@@ -75,46 +74,30 @@ func (s *Service) Get(ctx context.Context, id int64) (task.Task, error) {
 }
 
 func (s *Service) Create(ctx context.Context, in CreateInput) (task.Task, error) {
-	if in.Name == nil {
-		return task.Task{}, task.ErrNameRequired
-	}
-	name, err := normalizeName(*in.Name)
+	name, err := normalizeName(in.Name)
 	if err != nil {
 		return task.Task{}, err
 	}
-	status := task.StatusIncomplete
-	if in.Status != nil {
-		status = *in.Status
-	}
-	if !status.Valid() {
+	if !in.Status.Valid() {
 		return task.Task{}, task.ErrInvalidStatus
 	}
 	now := s.now().UTC()
-	t, err := s.store.Create(ctx, task.Task{Name: name, Status: status, Version: 1, CreatedAt: now, UpdatedAt: now})
+	t, err := s.store.Create(ctx, task.Task{Name: name, Status: in.Status, Version: 1, CreatedAt: now, UpdatedAt: now})
 	if err != nil {
 		return task.Task{}, fmt.Errorf("%w: create task: %v", task.ErrUnexpected, err)
 	}
 	return t, nil
 }
 
-func (s *Service) Replace(ctx context.Context, id int64, in ReplaceInput) (task.Task, error) {
-	if in.Name == nil {
-		return task.Task{}, task.ErrNameRequired
-	}
-	name, err := normalizeName(*in.Name)
+func (s *Service) Replace(ctx context.Context, id, expectedVersion int64, in ReplaceInput) (task.Task, error) {
+	name, err := normalizeName(in.Name)
 	if err != nil {
 		return task.Task{}, err
-	}
-	if in.Status == nil {
-		return task.Task{}, task.ErrStatusRequired
 	}
 	if !in.Status.Valid() {
 		return task.Task{}, task.ErrInvalidStatus
 	}
-	if in.Version == nil {
-		return task.Task{}, task.ErrVersionRequired
-	}
-	t, err := s.store.Update(ctx, id, *in.Version, TaskUpdate{Name: name, Status: *in.Status, UpdatedAt: s.now().UTC()})
+	t, err := s.store.Update(ctx, id, expectedVersion, TaskUpdate{Name: name, Status: in.Status, UpdatedAt: s.now().UTC()})
 	if err != nil {
 		if errors.Is(err, ErrRecordNotFound) {
 			return task.Task{}, task.ErrNotFound

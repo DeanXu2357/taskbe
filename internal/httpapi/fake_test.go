@@ -14,7 +14,7 @@ type fakeService struct {
 	list    func(ctx context.Context, p service.ListParams) (service.Page, error)
 	get     func(ctx context.Context, id int64) (task.Task, error)
 	create  func(ctx context.Context, in service.CreateInput) (task.Task, error)
-	replace func(ctx context.Context, id int64, in service.ReplaceInput) (task.Task, error)
+	replace func(ctx context.Context, id, expectedVersion int64, in service.ReplaceInput) (task.Task, error)
 	delete  func(ctx context.Context, id int64) error
 }
 
@@ -39,11 +39,11 @@ func (f *fakeService) Create(ctx context.Context, in service.CreateInput) (task.
 	return f.create(ctx, in)
 }
 
-func (f *fakeService) Replace(ctx context.Context, id int64, in service.ReplaceInput) (task.Task, error) {
+func (f *fakeService) Replace(ctx context.Context, id, expectedVersion int64, in service.ReplaceInput) (task.Task, error) {
 	if f.replace == nil {
 		return task.Task{}, errUnexpectedCall
 	}
-	return f.replace(ctx, id, in)
+	return f.replace(ctx, id, expectedVersion, in)
 }
 
 func (f *fakeService) Delete(ctx context.Context, id int64) error {
