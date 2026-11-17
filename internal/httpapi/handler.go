@@ -147,13 +147,74 @@ func (h *handler) createTask(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *handler) getTask(w http.ResponseWriter, r *http.Request, id int64) {
-	writeNotImplemented(w)
+	t, err := h.svc.Get(r.Context(), id)
+	if err != nil {
+		switch {
+		case errors.Is(err, task.ErrNotFound):
+			writeError(w, http.StatusNotFound, codeNotFound, "task not found")
+		case errors.Is(err, task.ErrNotImplemented):
+			writeNotImplemented(w)
+		default:
+			h.logger.ErrorContext(r.Context(), "get task failed", "id", id, "error", err)
+			writeError(w, http.StatusInternalServerError, codeInternalError, "internal server error")
+		}
+		return
+	}
+
+	writeJSON(w, http.StatusOK, dataResponse{Data: toTaskResponse(t)})
 }
 
 func (h *handler) replaceTask(w http.ResponseWriter, r *http.Request, id int64) {
-	writeNotImplemented(w)
+	var req replaceTaskRequest
+	if reqErr := decodeJSON(r, &req); reqErr != nil {
+		writeError(w, reqErr.status, reqErr.code, reqErr.message)
+		return
+	}
+	if req.ID != nil && *req.ID != id {
+		writeError(w, http.StatusBadRequest, codeValidationFailed, "id in body does not match path")
+		return
+	}
+
+	t, err := h.svc.Replace(r.Context(), id, service.ReplaceInput{Name: req.Name, Status: req.Status})
+	if err != nil {
+		switch {
+		case errors.Is(err, task.ErrNameRequired):
+			writeError(w, http.StatusBadRequest, codeValidationFailed, "name is required")
+		case errors.Is(err, task.ErrNameEmpty):
+			writeError(w, http.StatusBadRequest, codeValidationFailed, "name must not be empty")
+		case errors.Is(err, task.ErrNameTooLong):
+			writeError(w, http.StatusBadRequest, codeValidationFailed, fmt.Sprintf("invalid name: %s", err.Error()))
+		case errors.Is(err, task.ErrStatusRequired):
+			writeError(w, http.StatusBadRequest, codeValidationFailed, "status is required")
+		case errors.Is(err, task.ErrInvalidStatus):
+			writeError(w, http.StatusBadRequest, codeValidationFailed, "status must be 0 or 1")
+		case errors.Is(err, task.ErrNotFound):
+			writeError(w, http.StatusNotFound, codeNotFound, "task not found")
+		case errors.Is(err, task.ErrNotImplemented):
+			writeNotImplemented(w)
+		default:
+			h.logger.ErrorContext(r.Context(), "replace task failed", "id", id, "error", err)
+			writeError(w, http.StatusInternalServerError, codeInternalError, "internal server error")
+		}
+		return
+	}
+
+	writeJSON(w, http.StatusOK, dataResponse{Data: toTaskResponse(t)})
 }
 
 func (h *handler) deleteTask(w http.ResponseWriter, r *http.Request, id int64) {
-	writeNotImplemented(w)
+	if err := h.svc.Delete(r.Context(), id); err != nil {
+		switch {
+		case errors.Is(err, task.ErrNotFound):
+			writeError(w, http.StatusNotFound, codeNotFound, "task not found")
+		case errors.Is(err, task.ErrNotImplemented):
+			writeNotImplemented(w)
+		default:
+			h.logger.ErrorContext(r.Context(), "delete task failed", "id", id, "error", err)
+			writeError(w, http.StatusInternalServerError, codeInternalError, "internal server error")
+		}
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }

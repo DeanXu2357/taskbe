@@ -43,25 +43,6 @@ func decodeError(t *testing.T, rec *httptest.ResponseRecorder) errorBody {
 	return body
 }
 
-func TestRoutesNotImplementedYet(t *testing.T) {
-	h := newSkeletonAPI()
-	cases := []struct{ method, target string }{
-		{http.MethodGet, "/tasks/1"},
-		{http.MethodPut, "/tasks/1"},
-		{http.MethodDelete, "/tasks/1"},
-	}
-	for _, tc := range cases {
-		rec := do(h, tc.method, tc.target, "")
-		if rec.Code != http.StatusNotImplemented {
-			t.Errorf("%s %s: status = %d, want 501", tc.method, tc.target, rec.Code)
-			continue
-		}
-		if got := decodeError(t, rec).Error.Code; got != "not_implemented" {
-			t.Errorf("%s %s: code = %q, want not_implemented", tc.method, tc.target, got)
-		}
-	}
-}
-
 func TestMethodNotAllowed(t *testing.T) {
 	h := newSkeletonAPI()
 	cases := []struct{ method, target, allow string }{

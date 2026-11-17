@@ -24,6 +24,12 @@ type createTaskRequest struct {
 	Status *task.Status `json:"status"`
 }
 
+type replaceTaskRequest struct {
+	ID     *int64       `json:"id"`
+	Name   *string      `json:"name"`
+	Status *task.Status `json:"status"`
+}
+
 func decodeJSON(r *http.Request, dst any) *requestError {
 	// http.MaxBytesReader is not used because Go 1.18 has no http.MaxBytesError to tell its error apart.
 	body, err := io.ReadAll(io.LimitReader(r.Body, maxBodyBytes+1))
