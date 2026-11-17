@@ -1,11 +1,15 @@
 package httpapi
 
 import (
+	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/DeanXu2357/taskbe/internal/logx"
+	"github.com/DeanXu2357/taskbe/internal/task"
+	"github.com/DeanXu2357/taskbe/internal/task/service"
 )
 
 const taskPathPrefix = "/tasks/"
@@ -21,7 +25,7 @@ func New(svc TaskService, logger logx.Logger) http.Handler {
 	mux.HandleFunc("/tasks", h.collection)
 	mux.HandleFunc(taskPathPrefix, h.item)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		writeError(w, http.StatusNotFound, "not_found", "resource not found")
+		writeError(w, http.StatusNotFound, codeNotFound, "resource not found")
 	})
 	return mux
 }
@@ -40,7 +44,7 @@ func (h *handler) collection(w http.ResponseWriter, r *http.Request) {
 func (h *handler) item(w http.ResponseWriter, r *http.Request) {
 	id, ok := parseID(r.URL.Path)
 	if !ok {
-		writeError(w, http.StatusNotFound, "not_found", "task not found")
+		writeError(w, http.StatusNotFound, codeNotFound, "task not found")
 		return
 	}
 	switch r.Method {
@@ -65,11 +69,81 @@ func parseID(path string) (int64, bool) {
 }
 
 func (h *handler) listTasks(w http.ResponseWriter, r *http.Request) {
-	writeNotImplemented(w)
+	query := r.URL.Query()
+	params := service.ListParams{Limit: service.DefaultPageSize}
+	if s := query.Get("limit"); s != "" {
+		limit, err := strconv.Atoi(s)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, codeValidationFailed, "limit must be an integer")
+			return
+		}
+		params.Limit = limit
+	}
+	if s := query.Get("cursor"); s != "" {
+		afterID, err := decodeCursor(s)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, codeValidationFailed, "cursor is invalid")
+			return
+		}
+		params.AfterID = afterID
+	}
+
+	page, err := h.svc.List(r.Context(), params)
+	if err != nil {
+		switch {
+		case errors.Is(err, task.ErrInvalidLimit):
+			writeError(w, http.StatusBadRequest, codeValidationFailed, fmt.Sprintf("invalid query parameter: %s", err.Error()))
+		case errors.Is(err, task.ErrInvalidCursor):
+			writeError(w, http.StatusBadRequest, codeValidationFailed, "cursor is invalid")
+		case errors.Is(err, task.ErrNotImplemented):
+			writeNotImplemented(w)
+		default:
+			h.logger.ErrorContext(r.Context(), "list tasks failed", "error", err)
+			writeError(w, http.StatusInternalServerError, codeInternalError, "internal server error")
+		}
+		return
+	}
+
+	resp := listResponse{Data: make([]taskResponse, 0, len(page.Tasks))}
+	for _, t := range page.Tasks {
+		resp.Data = append(resp.Data, toTaskResponse(t))
+	}
+	if page.HasMore && len(page.Tasks) > 0 {
+		next := encodeCursor(page.Tasks[len(page.Tasks)-1].ID)
+		resp.NextCursor = &next
+	}
+	writeJSON(w, http.StatusOK, resp)
 }
 
 func (h *handler) createTask(w http.ResponseWriter, r *http.Request) {
-	writeNotImplemented(w)
+	var req createTaskRequest
+	if reqErr := decodeJSON(r, &req); reqErr != nil {
+		writeError(w, reqErr.status, reqErr.code, reqErr.message)
+		return
+	}
+
+	t, err := h.svc.Create(r.Context(), service.CreateInput{Name: req.Name, Status: req.Status})
+	if err != nil {
+		switch {
+		case errors.Is(err, task.ErrNameRequired):
+			writeError(w, http.StatusBadRequest, codeValidationFailed, "name is required")
+		case errors.Is(err, task.ErrNameEmpty):
+			writeError(w, http.StatusBadRequest, codeValidationFailed, "name must not be empty")
+		case errors.Is(err, task.ErrNameTooLong):
+			writeError(w, http.StatusBadRequest, codeValidationFailed, fmt.Sprintf("invalid name: %s", err.Error()))
+		case errors.Is(err, task.ErrInvalidStatus):
+			writeError(w, http.StatusBadRequest, codeValidationFailed, "status must be 0 or 1")
+		case errors.Is(err, task.ErrNotImplemented):
+			writeNotImplemented(w)
+		default:
+			h.logger.ErrorContext(r.Context(), "create task failed", "error", err)
+			writeError(w, http.StatusInternalServerError, codeInternalError, "internal server error")
+		}
+		return
+	}
+
+	w.Header().Set("Location", taskPathPrefix+strconv.FormatInt(t.ID, 10))
+	writeJSON(w, http.StatusCreated, dataResponse{Data: toTaskResponse(t)})
 }
 
 func (h *handler) getTask(w http.ResponseWriter, r *http.Request, id int64) {

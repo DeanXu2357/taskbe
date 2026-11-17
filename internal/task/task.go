@@ -28,14 +28,12 @@ const MaxNameLength = 200
 
 var (
 	ErrNotFound       = errors.New("task not found")
+	ErrNameRequired   = errors.New("name is required")
+	ErrNameEmpty      = errors.New("name must not be empty")
+	ErrNameTooLong    = errors.New("name must be at most 200 characters")
+	ErrStatusRequired = errors.New("status is required")
+	ErrInvalidStatus  = errors.New("status must be 0 or 1")
+	ErrInvalidLimit   = errors.New("limit must be between 1 and 100")
+	ErrInvalidCursor  = errors.New("cursor is invalid")
 	ErrNotImplemented = errors.New("not implemented")
 )
-
-type ValidationError struct {
-	Field   string
-	Message string
-}
-
-func (e *ValidationError) Error() string {
-	return e.Field + " " + e.Message
-}

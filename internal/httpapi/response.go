@@ -3,6 +3,21 @@ package httpapi
 import (
 	"encoding/json"
 	"net/http"
+	"time"
+
+	"github.com/DeanXu2357/taskbe/internal/task"
+)
+
+type errorCode string
+
+const (
+	codeInvalidJSON      errorCode = "invalid_json"
+	codeValidationFailed errorCode = "validation_failed"
+	codeNotFound         errorCode = "not_found"
+	codeMethodNotAllowed errorCode = "method_not_allowed"
+	codePayloadTooLarge  errorCode = "payload_too_large"
+	codeInternalError    errorCode = "internal_error"
+	codeNotImplemented   errorCode = "not_implemented"
 )
 
 type errorResponse struct {
@@ -10,8 +25,8 @@ type errorResponse struct {
 }
 
 type errorBody struct {
-	Code    string `json:"code"`
-	Message string `json:"message"`
+	Code    errorCode `json:"code"`
+	Message string    `json:"message"`
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
@@ -20,15 +35,42 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	_ = json.NewEncoder(w).Encode(v)
 }
 
-func writeError(w http.ResponseWriter, status int, code, message string) {
+func writeError(w http.ResponseWriter, status int, code errorCode, message string) {
 	writeJSON(w, status, errorResponse{Error: errorBody{Code: code, Message: message}})
 }
 
 func writeMethodNotAllowed(w http.ResponseWriter, allow string) {
 	w.Header().Set("Allow", allow)
-	writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed")
+	writeError(w, http.StatusMethodNotAllowed, codeMethodNotAllowed, "method not allowed")
 }
 
 func writeNotImplemented(w http.ResponseWriter) {
-	writeError(w, http.StatusNotImplemented, "not_implemented", "not implemented")
+	writeError(w, http.StatusNotImplemented, codeNotImplemented, "not implemented")
+}
+
+type dataResponse struct {
+	Data any `json:"data"`
+}
+
+type listResponse struct {
+	Data       []taskResponse `json:"data"`
+	NextCursor *string        `json:"next_cursor"`
+}
+
+type taskResponse struct {
+	ID        int64     `json:"id"`
+	Name      string    `json:"name"`
+	Status    int       `json:"status"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+func toTaskResponse(t task.Task) taskResponse {
+	return taskResponse{
+		ID:        t.ID,
+		Name:      t.Name,
+		Status:    int(t.Status),
+		CreatedAt: t.CreatedAt.UTC(),
+		UpdatedAt: t.UpdatedAt.UTC(),
+	}
 }
