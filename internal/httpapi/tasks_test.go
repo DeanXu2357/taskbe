@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -154,6 +155,7 @@ func TestCreateTaskServiceErrors(t *testing.T) {
 		{task.ErrInvalidStatus, http.StatusBadRequest, "validation_failed"},
 		{task.ErrNotImplemented, http.StatusNotImplemented, "not_implemented"},
 		{task.ErrNotFound, http.StatusInternalServerError, "internal_error"},
+		{fmt.Errorf("%w: boom", task.ErrUnexpected), http.StatusInternalServerError, "internal_error"},
 		{errors.New("boom"), http.StatusInternalServerError, "internal_error"},
 	}
 	for _, tc := range cases {
@@ -182,6 +184,7 @@ func TestListTasksServiceErrors(t *testing.T) {
 		{task.ErrInvalidLimit, http.StatusBadRequest, "validation_failed"},
 		{task.ErrInvalidCursor, http.StatusBadRequest, "validation_failed"},
 		{task.ErrNotImplemented, http.StatusNotImplemented, "not_implemented"},
+		{fmt.Errorf("%w: boom", task.ErrUnexpected), http.StatusInternalServerError, "internal_error"},
 		{errors.New("boom"), http.StatusInternalServerError, "internal_error"},
 	}
 	for _, tc := range cases {

@@ -3,6 +3,7 @@ package httpapi_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"testing"
 	"time"
@@ -45,6 +46,7 @@ func TestGetTaskServiceErrors(t *testing.T) {
 	}{
 		{task.ErrNotFound, http.StatusNotFound, "not_found"},
 		{task.ErrNotImplemented, http.StatusNotImplemented, "not_implemented"},
+		{fmt.Errorf("%w: boom", task.ErrUnexpected), http.StatusInternalServerError, "internal_error"},
 		{errors.New("boom"), http.StatusInternalServerError, "internal_error"},
 	}
 	for _, tc := range cases {
@@ -192,6 +194,7 @@ func TestReplaceTaskServiceErrors(t *testing.T) {
 		{task.ErrInvalidStatus, http.StatusBadRequest, "validation_failed"},
 		{task.ErrNotFound, http.StatusNotFound, "not_found"},
 		{task.ErrNotImplemented, http.StatusNotImplemented, "not_implemented"},
+		{fmt.Errorf("%w: boom", task.ErrUnexpected), http.StatusInternalServerError, "internal_error"},
 		{errors.New("boom"), http.StatusInternalServerError, "internal_error"},
 	}
 	for _, tc := range cases {
@@ -242,6 +245,7 @@ func TestDeleteTaskServiceErrors(t *testing.T) {
 	}{
 		{task.ErrNotFound, http.StatusNotFound, "not_found"},
 		{task.ErrNotImplemented, http.StatusNotImplemented, "not_implemented"},
+		{fmt.Errorf("%w: boom", task.ErrUnexpected), http.StatusInternalServerError, "internal_error"},
 		{errors.New("boom"), http.StatusInternalServerError, "internal_error"},
 	}
 	for _, tc := range cases {
