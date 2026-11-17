@@ -18,7 +18,6 @@ const (
 	codeConflict         errorCode = "conflict"
 	codePayloadTooLarge  errorCode = "payload_too_large"
 	codeInternalError    errorCode = "internal_error"
-	codeNotImplemented   errorCode = "not_implemented"
 )
 
 type errorResponse struct {
@@ -43,10 +42,6 @@ func writeError(w http.ResponseWriter, status int, code errorCode, message strin
 func writeMethodNotAllowed(w http.ResponseWriter, allow string) {
 	w.Header().Set("Allow", allow)
 	writeError(w, http.StatusMethodNotAllowed, codeMethodNotAllowed, "method not allowed")
-}
-
-func writeNotImplemented(w http.ResponseWriter) {
-	writeError(w, http.StatusNotImplemented, codeNotImplemented, "not implemented")
 }
 
 type dataResponse struct {

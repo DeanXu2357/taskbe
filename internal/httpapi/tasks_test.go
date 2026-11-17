@@ -153,7 +153,6 @@ func TestCreateTaskServiceErrors(t *testing.T) {
 		{task.ErrNameEmpty, http.StatusBadRequest, "validation_failed"},
 		{task.ErrNameTooLong, http.StatusBadRequest, "validation_failed"},
 		{task.ErrInvalidStatus, http.StatusBadRequest, "validation_failed"},
-		{task.ErrNotImplemented, http.StatusNotImplemented, "not_implemented"},
 		{task.ErrNotFound, http.StatusInternalServerError, "internal_error"},
 		{fmt.Errorf("%w: boom", task.ErrUnexpected), http.StatusInternalServerError, "internal_error"},
 		{errors.New("boom"), http.StatusInternalServerError, "internal_error"},
@@ -183,7 +182,6 @@ func TestListTasksServiceErrors(t *testing.T) {
 	}{
 		{task.ErrInvalidLimit, http.StatusBadRequest, "validation_failed"},
 		{task.ErrInvalidCursor, http.StatusBadRequest, "validation_failed"},
-		{task.ErrNotImplemented, http.StatusNotImplemented, "not_implemented"},
 		{fmt.Errorf("%w: boom", task.ErrUnexpected), http.StatusInternalServerError, "internal_error"},
 		{errors.New("boom"), http.StatusInternalServerError, "internal_error"},
 	}

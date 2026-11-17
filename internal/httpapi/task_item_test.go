@@ -45,7 +45,6 @@ func TestGetTaskServiceErrors(t *testing.T) {
 		wantCode   string
 	}{
 		{task.ErrNotFound, http.StatusNotFound, "not_found"},
-		{task.ErrNotImplemented, http.StatusNotImplemented, "not_implemented"},
 		{fmt.Errorf("%w: boom", task.ErrUnexpected), http.StatusInternalServerError, "internal_error"},
 		{errors.New("boom"), http.StatusInternalServerError, "internal_error"},
 	}
@@ -197,7 +196,6 @@ func TestReplaceTaskServiceErrors(t *testing.T) {
 		{task.ErrVersionRequired, http.StatusBadRequest, "validation_failed"},
 		{task.ErrVersionConflict, http.StatusConflict, "conflict"},
 		{task.ErrNotFound, http.StatusNotFound, "not_found"},
-		{task.ErrNotImplemented, http.StatusNotImplemented, "not_implemented"},
 		{fmt.Errorf("%w: boom", task.ErrUnexpected), http.StatusInternalServerError, "internal_error"},
 		{errors.New("boom"), http.StatusInternalServerError, "internal_error"},
 	}
@@ -248,7 +246,6 @@ func TestDeleteTaskServiceErrors(t *testing.T) {
 		wantCode   string
 	}{
 		{task.ErrNotFound, http.StatusNotFound, "not_found"},
-		{task.ErrNotImplemented, http.StatusNotImplemented, "not_implemented"},
 		{fmt.Errorf("%w: boom", task.ErrUnexpected), http.StatusInternalServerError, "internal_error"},
 		{errors.New("boom"), http.StatusInternalServerError, "internal_error"},
 	}

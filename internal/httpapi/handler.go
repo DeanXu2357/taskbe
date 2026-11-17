@@ -93,8 +93,6 @@ func (h *handler) listTasks(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusBadRequest, codeValidationFailed, fmt.Sprintf("invalid query parameter: %s", err.Error()))
 		case errors.Is(err, task.ErrInvalidCursor):
 			writeError(w, http.StatusBadRequest, codeValidationFailed, "cursor is invalid")
-		case errors.Is(err, task.ErrNotImplemented):
-			writeNotImplemented(w)
 		case errors.Is(err, task.ErrUnexpected):
 			h.logger.ErrorContext(r.Context(), "list tasks failed", "error", err)
 			writeError(w, http.StatusInternalServerError, codeInternalError, "internal server error")
@@ -134,8 +132,6 @@ func (h *handler) createTask(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusBadRequest, codeValidationFailed, fmt.Sprintf("invalid name: %s", err.Error()))
 		case errors.Is(err, task.ErrInvalidStatus):
 			writeError(w, http.StatusBadRequest, codeValidationFailed, "status must be 0 or 1")
-		case errors.Is(err, task.ErrNotImplemented):
-			writeNotImplemented(w)
 		case errors.Is(err, task.ErrUnexpected):
 			h.logger.ErrorContext(r.Context(), "create task failed", "error", err)
 			writeError(w, http.StatusInternalServerError, codeInternalError, "internal server error")
@@ -156,8 +152,6 @@ func (h *handler) getTask(w http.ResponseWriter, r *http.Request, id int64) {
 		switch {
 		case errors.Is(err, task.ErrNotFound):
 			writeError(w, http.StatusNotFound, codeNotFound, "task not found")
-		case errors.Is(err, task.ErrNotImplemented):
-			writeNotImplemented(w)
 		case errors.Is(err, task.ErrUnexpected):
 			h.logger.ErrorContext(r.Context(), "get task failed", "id", id, "error", err)
 			writeError(w, http.StatusInternalServerError, codeInternalError, "internal server error")
@@ -201,8 +195,6 @@ func (h *handler) replaceTask(w http.ResponseWriter, r *http.Request, id int64) 
 			writeError(w, http.StatusNotFound, codeNotFound, "task not found")
 		case errors.Is(err, task.ErrVersionConflict):
 			writeError(w, http.StatusConflict, codeConflict, "version does not match the current task")
-		case errors.Is(err, task.ErrNotImplemented):
-			writeNotImplemented(w)
 		case errors.Is(err, task.ErrUnexpected):
 			h.logger.ErrorContext(r.Context(), "replace task failed", "id", id, "error", err)
 			writeError(w, http.StatusInternalServerError, codeInternalError, "internal server error")
@@ -221,8 +213,6 @@ func (h *handler) deleteTask(w http.ResponseWriter, r *http.Request, id int64) {
 		switch {
 		case errors.Is(err, task.ErrNotFound):
 			writeError(w, http.StatusNotFound, codeNotFound, "task not found")
-		case errors.Is(err, task.ErrNotImplemented):
-			writeNotImplemented(w)
 		case errors.Is(err, task.ErrUnexpected):
 			h.logger.ErrorContext(r.Context(), "delete task failed", "id", id, "error", err)
 			writeError(w, http.StatusInternalServerError, codeInternalError, "internal server error")
