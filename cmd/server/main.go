@@ -20,14 +20,23 @@ const shutdownTimeout = 10 * time.Second
 func main() {
 	logger := logx.New(log.Default())
 
+	cfg, err := loadConfig(os.Getenv)
+	if err != nil {
+		logger.Error("invalid config", "error", err)
+		os.Exit(1)
+	}
+
 	store := memory.New()
 	svc := service.New(store, time.Now)
 	mux := http.NewServeMux()
 	httpapi.Register(mux, svc, logger)
 	srv := &http.Server{
-		Addr:              ":8080",
-		Handler:           mux,
+		Addr:              cfg.Addr,
+		Handler:           httpapi.LogRequests(logger, httpapi.RecoverPanics(logger, mux)),
 		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      10 * time.Second,
+		IdleTimeout:       60 * time.Second,
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -51,7 +60,7 @@ func main() {
 
 	logger.Info("shutting down", "timeout", shutdownTimeout)
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
-	err := srv.Shutdown(shutdownCtx)
+	err = srv.Shutdown(shutdownCtx)
 	cancel()
 	if err != nil {
 		logger.Error("graceful shutdown failed", "error", err)
