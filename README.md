@@ -50,7 +50,7 @@ A task has this shape:
 | `name` | Required. The server trims leading and trailing white space. The result must be 1 to 200 characters (Unicode code points). |
 | `status` | `0` is incomplete. `1` is completed. |
 | `version` | Starts at 1. Each successful `PUT` increases it by 1. |
-| `created_at`, `updated_at` | UTC, RFC 3339 with nanoseconds. |
+| `created_at`, `updated_at` | UTC, RFC 3339, up to nanosecond precision. The server removes trailing zeros from the fraction, and leaves out a fraction of zero. |
 
 A single task is returned as `{"data": <task>}`.
 A list is returned as `{"data": [<task>, ...], "next_cursor": "<string>" | null}`.
@@ -186,7 +186,7 @@ The version is in the body and not in an `If-Match` header. The `id` is also all
 
 **Keyset pagination with a default page size.** Without parameters, `GET /tasks` returns the first 20 tasks, not all tasks. A list that has no limit becomes slow and large as the data grows. The cursor is an opaque, base64url-encoded `{"after_id": N}`. A keyset cursor is stable when other requests create or delete tasks, which offset paging is not. If the cursor points to a deleted task, the next page starts after that id. The memory store keeps a sorted slice of ids, so a page is a binary search and not a sort of all tasks.
 
-**Strict input rules.**
+**Input rules.**
 
 - Unknown fields are ignored. This keeps old servers compatible with newer clients.
 - The body limit is 1 MiB.
