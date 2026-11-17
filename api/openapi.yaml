@@ -256,9 +256,8 @@ components:
         status:
           type: integer
           enum: [0, 1]
-          nullable: true
           default: 0
-          description: Optional. Omitted or null means 0.
+          description: Optional. Omitted means 0.
     ReplaceTaskRequest:
       type: object
       required: [name, status, version]

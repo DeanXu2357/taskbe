@@ -161,25 +161,28 @@ func TestReplaceTaskRequiresFields(t *testing.T) {
 }
 
 func TestReplaceTaskRejectsBody(t *testing.T) {
-	called := false
-	mux := http.NewServeMux()
-	httpapi.Register(mux, &fakeService{
-		replace: func(context.Context, int64, int64, service.ReplaceInput) (task.Task, error) {
-			called = true
-			return task.Task{}, nil
-		},
-	}, discardLogger)
+	for _, body := range []string{`{`, `null`} {
+		called := false
+		mux := http.NewServeMux()
+		httpapi.Register(mux, &fakeService{
+			replace: func(context.Context, int64, int64, service.ReplaceInput) (task.Task, error) {
+				called = true
+				return task.Task{}, nil
+			},
+		}, discardLogger)
 
-	rec := do(mux, http.MethodPut, "/tasks/1", "{")
+		rec := do(mux, http.MethodPut, "/tasks/1", body)
 
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want 400", rec.Code)
-	}
-	if code := decodeError(t, rec).Error.Code; code != "invalid_json" {
-		t.Errorf("code = %q, want invalid_json", code)
-	}
-	if called {
-		t.Error("service was called")
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("%s: status = %d, want 400", body, rec.Code)
+			continue
+		}
+		if code := decodeError(t, rec).Error.Code; code != "invalid_json" {
+			t.Errorf("%s: code = %q, want invalid_json", body, code)
+		}
+		if called {
+			t.Errorf("%s: service was called", body)
+		}
 	}
 }
 

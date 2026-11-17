@@ -90,7 +90,7 @@ func TestCreateTaskDecodesInput(t *testing.T) {
 }
 
 func TestCreateTaskRequiresName(t *testing.T) {
-	for _, body := range []string{`{}`, `{"status":1}`, `{"name":null}`, `null`} {
+	for _, body := range []string{`{}`, `{"status":1}`, `{"name":null}`} {
 		called := false
 		mux := http.NewServeMux()
 		httpapi.Register(mux, &fakeService{
@@ -124,6 +124,7 @@ func TestCreateTaskRejectsBody(t *testing.T) {
 		{``, http.StatusBadRequest, "invalid_json"},
 		{`{`, http.StatusBadRequest, "invalid_json"},
 		{`[]`, http.StatusBadRequest, "invalid_json"},
+		{`null`, http.StatusBadRequest, "invalid_json"},
 		{`{"name":"a"} {"name":"b"}`, http.StatusBadRequest, "invalid_json"},
 		{`{"name":123}`, http.StatusBadRequest, "invalid_json"},
 		{`{"name":"a","status":"1"}`, http.StatusBadRequest, "invalid_json"},

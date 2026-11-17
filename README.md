@@ -59,7 +59,7 @@ All responses except `204` have `Content-Type: application/json`.
 
 ### `POST /tasks`
 
-Creates a task. `status` is optional. If `status` is omitted or `null`, the server uses `0`.
+Creates a task. `status` is optional. If `status` is omitted, the server uses `0`.
 
 ```sh
 curl -i -X POST localhost:8080/tasks -d '{"name":"Buy breakfast"}'
@@ -180,7 +180,7 @@ Each interface is declared in the package that uses it. To use a database, write
 **Optimistic locking on `PUT`.** The exercise only says that `PUT /tasks/{id}` updates a task. A plain overwrite of `name` and `status` silently loses one of two concurrent updates. So each task has a `version`, and a `PUT` must send the version that it read. The store compares the version and writes in one atomic step, the same as `UPDATE ... SET version = version + 1 WHERE id = ? AND version = ?`. A stale version gets `409 Conflict`. The cost is that a `PUT` with only `name` and `status` gets `400 version is required`.
 The version is in the body and not in an `If-Match` header. The `id` is also allowed in the body, and each item of a list already includes its version.
 
-**`PUT` replaces the whole task.** `name` and `status` are required. The service inputs have no pointers, because the HTTP layer never lets a required field reach the service missing. On `POST`, an omitted or `null` status decodes to `0`, which is the documented default.
+**`PUT` replaces the whole task.** `name` and `status` are required. The service inputs have no pointers, because the HTTP layer never lets a required field reach the service missing. On `POST`, an omitted status decodes to `0`, which is the documented default.
 
 **Keyset pagination with a default page size.** Without parameters, `GET /tasks` returns the first 20 tasks, not all tasks. A list that has no limit becomes slow and large as the data grows. The cursor is an opaque, base64url-encoded `{"after_id": N}`. A keyset cursor is stable when other requests create or delete tasks, which offset paging is not. If the cursor points to a deleted task, the next page starts after that id. The memory store keeps a sorted slice of ids, so a page is a binary search and not a sort of all tasks.
 

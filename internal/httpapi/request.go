@@ -41,8 +41,13 @@ func decodeJSON(r *http.Request, dst any) *requestError {
 	if len(body) > maxBodyBytes {
 		return &requestError{http.StatusRequestEntityTooLarge, codePayloadTooLarge, "request body must not exceed 1 MiB"}
 	}
-	if len(bytes.TrimSpace(body)) == 0 {
+	trimmed := bytes.TrimSpace(body)
+	if len(trimmed) == 0 {
 		return &requestError{http.StatusBadRequest, codeInvalidJSON, "request body is empty"}
+	}
+	// json.Unmarshal treats a null body as a no-op and returns no error.
+	if bytes.Equal(trimmed, []byte("null")) {
+		return &requestError{http.StatusBadRequest, codeInvalidJSON, "request body must be a JSON object"}
 	}
 	if err := json.Unmarshal(body, dst); err != nil {
 		var typeErr *json.UnmarshalTypeError
