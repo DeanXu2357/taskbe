@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -39,13 +40,19 @@ func main() {
 		IdleTimeout:       60 * time.Second,
 	}
 
+	ln, err := net.Listen("tcp", srv.Addr)
+	if err != nil {
+		logger.Error("listen failed", "error", err)
+		os.Exit(1)
+	}
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 
 	serveErr := make(chan error, 1)
 	go func() {
-		logger.Info("server listening", "addr", srv.Addr)
-		serveErr <- srv.ListenAndServe()
+		serveErr <- srv.Serve(ln)
 	}()
+	logger.Info("server listening", "addr", ln.Addr().String())
 
 	select {
 	case err := <-serveErr:

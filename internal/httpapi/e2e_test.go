@@ -23,7 +23,7 @@ func TestEndToEnd(t *testing.T) {
 	mux := http.NewServeMux()
 	httpapi.Register(mux, service.New(memory.New(), time.Now), discardLogger)
 
-	decode := func(body []byte, v interface{}) {
+	decode := func(body []byte, v any) {
 		t.Helper()
 		if err := json.Unmarshal(body, v); err != nil {
 			t.Fatalf("decode %q: %v", body, err)
