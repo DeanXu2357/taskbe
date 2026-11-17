@@ -1,0 +1,131 @@
+package httpapi_test
+
+import (
+	"encoding/json"
+	"io"
+	"log"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+
+	"github.com/DeanXu2357/taskbe/internal/httpapi"
+	"github.com/DeanXu2357/taskbe/internal/logx"
+)
+
+type errorBody struct {
+	Error struct {
+		Code    string `json:"code"`
+		Message string `json:"message"`
+	} `json:"error"`
+}
+
+func do(h http.Handler, method, target, body string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(method, target, strings.NewReader(body))
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	return rec
+}
+
+func newSkeletonAPI() http.Handler {
+	return httpapi.New(&fakeService{}, logx.New(log.New(io.Discard, "", 0)))
+}
+
+func decodeError(t *testing.T, rec *httptest.ResponseRecorder) errorBody {
+	t.Helper()
+	if ct := rec.Header().Get("Content-Type"); ct != "application/json" {
+		t.Fatalf("Content-Type = %q, want application/json", ct)
+	}
+	var body errorBody
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode error body %q: %v", rec.Body.String(), err)
+	}
+	return body
+}
+
+func TestRoutesNotImplementedYet(t *testing.T) {
+	h := newSkeletonAPI()
+	cases := []struct{ method, target string }{
+		{http.MethodGet, "/tasks"},
+		{http.MethodPost, "/tasks"},
+		{http.MethodGet, "/tasks/1"},
+		{http.MethodPut, "/tasks/1"},
+		{http.MethodDelete, "/tasks/1"},
+	}
+	for _, tc := range cases {
+		rec := do(h, tc.method, tc.target, "")
+		if rec.Code != http.StatusNotImplemented {
+			t.Errorf("%s %s: status = %d, want 501", tc.method, tc.target, rec.Code)
+			continue
+		}
+		if got := decodeError(t, rec).Error.Code; got != "not_implemented" {
+			t.Errorf("%s %s: code = %q, want not_implemented", tc.method, tc.target, got)
+		}
+	}
+}
+
+func TestMethodNotAllowed(t *testing.T) {
+	h := newSkeletonAPI()
+	cases := []struct{ method, target, allow string }{
+		{http.MethodPut, "/tasks", "GET, POST"},
+		{http.MethodDelete, "/tasks", "GET, POST"},
+		{http.MethodPatch, "/tasks", "GET, POST"},
+		{http.MethodPost, "/tasks/1", "GET, PUT, DELETE"},
+		{http.MethodPatch, "/tasks/1", "GET, PUT, DELETE"},
+	}
+	for _, tc := range cases {
+		rec := do(h, tc.method, tc.target, "")
+		if rec.Code != http.StatusMethodNotAllowed {
+			t.Errorf("%s %s: status = %d, want 405", tc.method, tc.target, rec.Code)
+			continue
+		}
+		if got := rec.Header().Get("Allow"); got != tc.allow {
+			t.Errorf("%s %s: Allow = %q, want %q", tc.method, tc.target, got, tc.allow)
+		}
+		body := decodeError(t, rec)
+		if body.Error.Code != "method_not_allowed" || body.Error.Message != "method not allowed" {
+			t.Errorf("%s %s: error = %+v", tc.method, tc.target, body.Error)
+		}
+	}
+}
+
+func TestInvalidTaskPaths(t *testing.T) {
+	h := newSkeletonAPI()
+	paths := []string{
+		"/tasks/",
+		"/tasks/abc",
+		"/tasks/0",
+		"/tasks/-1",
+		"/tasks/01",
+		"/tasks/+1",
+		"/tasks/1/",
+		"/tasks/1/x",
+		"/tasks/99999999999999999999",
+	}
+	for _, p := range paths {
+		rec := do(h, http.MethodGet, p, "")
+		if rec.Code != http.StatusNotFound {
+			t.Errorf("GET %s: status = %d, want 404", p, rec.Code)
+			continue
+		}
+		body := decodeError(t, rec)
+		if body.Error.Code != "not_found" || body.Error.Message != "task not found" {
+			t.Errorf("GET %s: error = %+v", p, body.Error)
+		}
+	}
+}
+
+func TestUnknownPath(t *testing.T) {
+	h := newSkeletonAPI()
+	for _, p := range []string{"/", "/foo"} {
+		rec := do(h, http.MethodGet, p, "")
+		if rec.Code != http.StatusNotFound {
+			t.Errorf("GET %s: status = %d, want 404", p, rec.Code)
+			continue
+		}
+		body := decodeError(t, rec)
+		if body.Error.Code != "not_found" || body.Error.Message != "resource not found" {
+			t.Errorf("GET %s: error = %+v", p, body.Error)
+		}
+	}
+}
