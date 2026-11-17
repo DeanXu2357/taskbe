@@ -39,7 +39,7 @@ func TestCreateNameRules(t *testing.T) {
 			},
 		}, func() time.Time { return t0 })
 
-		_, err := svc.Create(context.Background(), service.CreateInput{Name: tc.in})
+		_, err := svc.Create(context.Background(), task.CreateInput{Name: tc.in})
 
 		if !errors.Is(err, tc.wantErr) {
 			t.Errorf("%q: err = %v, want %v", tc.in, err, tc.wantErr)
@@ -67,7 +67,7 @@ func TestCreate(t *testing.T) {
 		},
 	}, func() time.Time { return t0 })
 
-	res, err := svc.Create(context.Background(), service.CreateInput{Name: "  買早餐 "})
+	res, err := svc.Create(context.Background(), task.CreateInput{Name: "  買早餐 "})
 
 	if err != nil {
 		t.Fatalf("err = %v", err)
@@ -83,12 +83,12 @@ func TestCreate(t *testing.T) {
 
 func TestCreateValidation(t *testing.T) {
 	cases := []struct {
-		in      service.CreateInput
+		in      task.CreateInput
 		wantErr error
 	}{
-		{service.CreateInput{Name: "   "}, task.ErrNameEmpty},
-		{service.CreateInput{Name: "a", Status: task.Status(2)}, task.ErrInvalidStatus},
-		{service.CreateInput{Name: "a", Status: task.Status(-1)}, task.ErrInvalidStatus},
+		{task.CreateInput{Name: "   "}, task.ErrNameEmpty},
+		{task.CreateInput{Name: "a", Status: task.Status(2)}, task.ErrInvalidStatus},
+		{task.CreateInput{Name: "a", Status: task.Status(-1)}, task.ErrInvalidStatus},
 	}
 	for i, tc := range cases {
 		svc := service.New(&fakeStore{}, func() time.Time { return t0 })
@@ -112,7 +112,7 @@ func TestReplace(t *testing.T) {
 		},
 	}, func() time.Time { return t1 })
 
-	res, err := svc.Replace(context.Background(), 1, 3, service.ReplaceInput{Name: "b", Status: task.StatusCompleted})
+	res, err := svc.Replace(context.Background(), 1, 3, task.ReplaceInput{Name: "b", Status: task.StatusCompleted})
 
 	if err != nil {
 		t.Fatalf("err = %v", err)
@@ -128,12 +128,12 @@ func TestReplace(t *testing.T) {
 
 func TestReplaceValidation(t *testing.T) {
 	cases := []struct {
-		in      service.ReplaceInput
+		in      task.ReplaceInput
 		wantErr error
 	}{
-		{service.ReplaceInput{Name: " ", Status: task.StatusCompleted}, task.ErrNameEmpty},
-		{service.ReplaceInput{Name: strings.Repeat("字", 201), Status: task.StatusCompleted}, task.ErrNameTooLong},
-		{service.ReplaceInput{Name: "a", Status: task.Status(2)}, task.ErrInvalidStatus},
+		{task.ReplaceInput{Name: " ", Status: task.StatusCompleted}, task.ErrNameEmpty},
+		{task.ReplaceInput{Name: strings.Repeat("字", 201), Status: task.StatusCompleted}, task.ErrNameTooLong},
+		{task.ReplaceInput{Name: "a", Status: task.Status(2)}, task.ErrInvalidStatus},
 	}
 	for i, tc := range cases {
 		svc := service.New(&fakeStore{}, func() time.Time { return t1 })
@@ -163,7 +163,7 @@ func TestStoreNotFoundIsTranslated(t *testing.T) {
 	if _, err := svc.Get(ctx, 1); err != task.ErrNotFound {
 		t.Errorf("Get err = %v, want ErrNotFound", err)
 	}
-	if _, err := svc.Replace(ctx, 1, 1, service.ReplaceInput{Name: "a", Status: task.StatusCompleted}); err != task.ErrNotFound {
+	if _, err := svc.Replace(ctx, 1, 1, task.ReplaceInput{Name: "a", Status: task.StatusCompleted}); err != task.ErrNotFound {
 		t.Errorf("Replace err = %v, want ErrNotFound", err)
 	}
 	if err := svc.Delete(ctx, 1); err != task.ErrNotFound {
@@ -178,7 +178,7 @@ func TestStoreVersionMismatchIsTranslated(t *testing.T) {
 		},
 	}, func() time.Time { return t1 })
 
-	_, err := svc.Replace(context.Background(), 1, 1, service.ReplaceInput{Name: "a", Status: task.StatusCompleted})
+	_, err := svc.Replace(context.Background(), 1, 1, task.ReplaceInput{Name: "a", Status: task.StatusCompleted})
 
 	if err != task.ErrVersionConflict {
 		t.Errorf("err = %v, want ErrVersionConflict", err)
@@ -205,11 +205,11 @@ func TestStoreFailuresAreWrapped(t *testing.T) {
 		},
 	}, func() time.Time { return t1 })
 	ctx := context.Background()
-	valid := service.ReplaceInput{Name: "a", Status: task.StatusCompleted}
+	valid := task.ReplaceInput{Name: "a", Status: task.StatusCompleted}
 
-	_, listErr := svc.List(ctx, service.ListParams{Limit: 20})
+	_, listErr := svc.List(ctx, task.ListParams{Limit: 20})
 	_, getErr := svc.Get(ctx, 1)
-	_, createErr := svc.Create(ctx, service.CreateInput{Name: "a"})
+	_, createErr := svc.Create(ctx, task.CreateInput{Name: "a"})
 	_, replaceErr := svc.Replace(ctx, 1, 1, valid)
 	deleteErr := svc.Delete(ctx, 1)
 
@@ -272,7 +272,7 @@ func TestListPaging(t *testing.T) {
 			},
 		}, func() time.Time { return t0 })
 
-		page, err := svc.List(context.Background(), service.ListParams{AfterID: 0, Limit: 3})
+		page, err := svc.List(context.Background(), task.ListParams{AfterID: 0, Limit: 3})
 
 		if err != nil {
 			t.Fatalf("stored %d: err = %v", tc.stored, err)
@@ -288,14 +288,14 @@ func TestListPaging(t *testing.T) {
 
 func TestListValidation(t *testing.T) {
 	cases := []struct {
-		p       service.ListParams
+		p       task.ListParams
 		wantErr error
 	}{
-		{service.ListParams{Limit: 0}, task.ErrInvalidLimit},
-		{service.ListParams{Limit: -1}, task.ErrInvalidLimit},
-		{service.ListParams{Limit: 101}, task.ErrInvalidLimit},
-		{service.ListParams{AfterID: -1, Limit: 20}, task.ErrInvalidCursor},
-		{service.ListParams{Limit: 100}, nil},
+		{task.ListParams{Limit: 0}, task.ErrInvalidLimit},
+		{task.ListParams{Limit: -1}, task.ErrInvalidLimit},
+		{task.ListParams{Limit: 101}, task.ErrInvalidLimit},
+		{task.ListParams{AfterID: -1, Limit: 20}, task.ErrInvalidCursor},
+		{task.ListParams{Limit: 100}, nil},
 	}
 	for _, tc := range cases {
 		svc := service.New(&fakeStore{

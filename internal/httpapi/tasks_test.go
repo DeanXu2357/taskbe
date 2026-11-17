@@ -16,7 +16,6 @@ import (
 	"github.com/DeanXu2357/taskbe/internal/httpapi"
 	"github.com/DeanXu2357/taskbe/internal/logx"
 	"github.com/DeanXu2357/taskbe/internal/task"
-	"github.com/DeanXu2357/taskbe/internal/task/service"
 )
 
 var t0 = time.Date(2026, 11, 17, 8, 0, 0, 0, time.UTC)
@@ -31,10 +30,10 @@ func assertBody(t *testing.T, got, want string) {
 }
 
 func TestCreateTask(t *testing.T) {
-	var got service.CreateInput
+	var got task.CreateInput
 	mux := http.NewServeMux()
 	httpapi.Register(mux, &fakeService{
-		create: func(_ context.Context, in service.CreateInput) (task.Task, error) {
+		create: func(_ context.Context, in task.CreateInput) (task.Task, error) {
 			got = in
 			return task.Task{ID: 1, Name: "買早餐", Status: task.StatusIncomplete, Version: 1, CreatedAt: t0, UpdatedAt: t0}, nil
 		},
@@ -53,7 +52,7 @@ func TestCreateTask(t *testing.T) {
 	}
 	assertBody(t, rec.Body.String(),
 		`{"data":{"id":1,"name":"買早餐","status":0,"version":1,"created_at":"2026-11-17T08:00:00Z","updated_at":"2026-11-17T08:00:00Z"}}`)
-	if want := (service.CreateInput{Name: "買早餐", Status: task.StatusIncomplete}); got != want {
+	if want := (task.CreateInput{Name: "買早餐", Status: task.StatusIncomplete}); got != want {
 		t.Errorf("service got %+v, want %+v", got, want)
 	}
 }
@@ -61,17 +60,17 @@ func TestCreateTask(t *testing.T) {
 func TestCreateTaskDecodesInput(t *testing.T) {
 	cases := []struct {
 		body string
-		want service.CreateInput
+		want task.CreateInput
 	}{
-		{`{"name":"a","status":1}`, service.CreateInput{Name: "a", Status: task.StatusCompleted}},
-		{`{"name":"a","status":null}`, service.CreateInput{Name: "a", Status: task.StatusIncomplete}},
-		{`{"name":"a","foo":1}`, service.CreateInput{Name: "a", Status: task.StatusIncomplete}},
+		{`{"name":"a","status":1}`, task.CreateInput{Name: "a", Status: task.StatusCompleted}},
+		{`{"name":"a","status":null}`, task.CreateInput{Name: "a", Status: task.StatusIncomplete}},
+		{`{"name":"a","foo":1}`, task.CreateInput{Name: "a", Status: task.StatusIncomplete}},
 	}
 	for _, tc := range cases {
-		var got service.CreateInput
+		var got task.CreateInput
 		mux := http.NewServeMux()
 		httpapi.Register(mux, &fakeService{
-			create: func(_ context.Context, in service.CreateInput) (task.Task, error) {
+			create: func(_ context.Context, in task.CreateInput) (task.Task, error) {
 				got = in
 				return task.Task{ID: 1}, nil
 			},
@@ -94,7 +93,7 @@ func TestCreateTaskRequiresName(t *testing.T) {
 		called := false
 		mux := http.NewServeMux()
 		httpapi.Register(mux, &fakeService{
-			create: func(context.Context, service.CreateInput) (task.Task, error) {
+			create: func(context.Context, task.CreateInput) (task.Task, error) {
 				called = true
 				return task.Task{}, nil
 			},
@@ -136,7 +135,7 @@ func TestCreateTaskRejectsBody(t *testing.T) {
 		called := false
 		mux := http.NewServeMux()
 		httpapi.Register(mux, &fakeService{
-			create: func(context.Context, service.CreateInput) (task.Task, error) {
+			create: func(context.Context, task.CreateInput) (task.Task, error) {
 				called = true
 				return task.Task{}, nil
 			},
@@ -184,7 +183,7 @@ func TestCreateTaskServiceErrors(t *testing.T) {
 		t.Run(err.Error(), func(t *testing.T) {
 			mux := http.NewServeMux()
 			httpapi.Register(mux, &fakeService{
-				create: func(context.Context, service.CreateInput) (task.Task, error) {
+				create: func(context.Context, task.CreateInput) (task.Task, error) {
 					return task.Task{}, err
 				},
 			}, discardLogger)
@@ -212,8 +211,8 @@ func TestListTasksServiceErrors(t *testing.T) {
 		t.Run(err.Error(), func(t *testing.T) {
 			mux := http.NewServeMux()
 			httpapi.Register(mux, &fakeService{
-				list: func(context.Context, service.ListParams) (service.Page, error) {
-					return service.Page{}, err
+				list: func(context.Context, task.ListParams) (task.Page, error) {
+					return task.Page{}, err
 				},
 			}, discardLogger)
 
@@ -235,12 +234,12 @@ func assertServiceError(t *testing.T, rec *httptest.ResponseRecorder, wantStatus
 }
 
 func TestListTasks(t *testing.T) {
-	var got service.ListParams
+	var got task.ListParams
 	mux := http.NewServeMux()
 	httpapi.Register(mux, &fakeService{
-		list: func(_ context.Context, p service.ListParams) (service.Page, error) {
+		list: func(_ context.Context, p task.ListParams) (task.Page, error) {
 			got = p
-			return service.Page{
+			return task.Page{
 				Tasks: []task.Task{
 					{ID: 1, Name: "買早餐", Status: task.StatusIncomplete, Version: 1, CreatedAt: t0, UpdatedAt: t0},
 					{ID: 2, Name: "買午餐", Status: task.StatusCompleted, Version: 2, CreatedAt: t0, UpdatedAt: t0.Add(time.Hour)},
@@ -255,7 +254,7 @@ func TestListTasks(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", rec.Code)
 	}
-	if got != (service.ListParams{AfterID: 0, Limit: 20}) {
+	if got != (task.ListParams{AfterID: 0, Limit: 20}) {
 		t.Errorf("service got %+v, want {AfterID:0 Limit:20}", got)
 	}
 	assertBody(t, rec.Body.String(),
@@ -268,8 +267,8 @@ func TestListTasks(t *testing.T) {
 func TestListLastPage(t *testing.T) {
 	mux := http.NewServeMux()
 	httpapi.Register(mux, &fakeService{
-		list: func(context.Context, service.ListParams) (service.Page, error) {
-			return service.Page{Tasks: nil, HasMore: false}, nil
+		list: func(context.Context, task.ListParams) (task.Page, error) {
+			return task.Page{Tasks: nil, HasMore: false}, nil
 		},
 	}, discardLogger)
 
@@ -284,18 +283,18 @@ func TestListLastPage(t *testing.T) {
 func TestListParsesQuery(t *testing.T) {
 	cases := []struct {
 		target string
-		want   service.ListParams
+		want   task.ListParams
 	}{
-		{"/tasks?limit=5&cursor=eyJhZnRlcl9pZCI6Mn0", service.ListParams{AfterID: 2, Limit: 5}},
-		{"/tasks?limit=101", service.ListParams{AfterID: 0, Limit: 101}},
+		{"/tasks?limit=5&cursor=eyJhZnRlcl9pZCI6Mn0", task.ListParams{AfterID: 2, Limit: 5}},
+		{"/tasks?limit=101", task.ListParams{AfterID: 0, Limit: 101}},
 	}
 	for _, tc := range cases {
-		var got service.ListParams
+		var got task.ListParams
 		mux := http.NewServeMux()
 		httpapi.Register(mux, &fakeService{
-			list: func(_ context.Context, p service.ListParams) (service.Page, error) {
+			list: func(_ context.Context, p task.ListParams) (task.Page, error) {
 				got = p
-				return service.Page{}, nil
+				return task.Page{}, nil
 			},
 		}, discardLogger)
 
@@ -324,9 +323,9 @@ func TestListRejectsQuery(t *testing.T) {
 		called := false
 		mux := http.NewServeMux()
 		httpapi.Register(mux, &fakeService{
-			list: func(context.Context, service.ListParams) (service.Page, error) {
+			list: func(context.Context, task.ListParams) (task.Page, error) {
 				called = true
-				return service.Page{}, nil
+				return task.Page{}, nil
 			},
 		}, discardLogger)
 

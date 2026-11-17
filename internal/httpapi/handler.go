@@ -9,7 +9,6 @@ import (
 
 	"github.com/DeanXu2357/taskbe/internal/logx"
 	"github.com/DeanXu2357/taskbe/internal/task"
-	"github.com/DeanXu2357/taskbe/internal/task/service"
 )
 
 const taskPathPrefix = "/tasks/"
@@ -68,7 +67,7 @@ func parseID(path string) (int64, bool) {
 
 func (h *handler) listTasks(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
-	params := service.ListParams{Limit: service.DefaultPageSize}
+	params := task.ListParams{Limit: task.DefaultPageSize}
 	if s := query.Get("limit"); s != "" {
 		limit, err := strconv.Atoi(s)
 		if err != nil {
@@ -125,7 +124,7 @@ func (h *handler) createTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	t, err := h.svc.Create(r.Context(), service.CreateInput{Name: *req.Name, Status: req.Status})
+	t, err := h.svc.Create(r.Context(), task.CreateInput{Name: *req.Name, Status: req.Status})
 	if err != nil {
 		switch {
 		case errors.Is(err, task.ErrNameEmpty):
@@ -190,7 +189,7 @@ func (h *handler) replaceTask(w http.ResponseWriter, r *http.Request, id int64) 
 		return
 	}
 
-	t, err := h.svc.Replace(r.Context(), id, *req.Version, service.ReplaceInput{Name: *req.Name, Status: *req.Status})
+	t, err := h.svc.Replace(r.Context(), id, *req.Version, task.ReplaceInput{Name: *req.Name, Status: *req.Status})
 	if err != nil {
 		switch {
 		case errors.Is(err, task.ErrNameEmpty):

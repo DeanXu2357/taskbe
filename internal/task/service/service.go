@@ -11,8 +11,6 @@ import (
 	"github.com/DeanXu2357/taskbe/internal/task"
 )
 
-const DefaultPageSize = 20
-
 const (
 	maxPageSize   = 100
 	maxNameLength = 200
@@ -27,41 +25,21 @@ func New(store Store, now func() time.Time) *Service {
 	return &Service{store: store, now: now}
 }
 
-type CreateInput struct {
-	Name   string
-	Status task.Status
-}
-
-type ReplaceInput struct {
-	Name   string
-	Status task.Status
-}
-
-type ListParams struct {
-	AfterID int64
-	Limit   int
-}
-
-type Page struct {
-	Tasks   []task.Task
-	HasMore bool
-}
-
-func (s *Service) List(ctx context.Context, p ListParams) (Page, error) {
+func (s *Service) List(ctx context.Context, p task.ListParams) (task.Page, error) {
 	if p.Limit < 1 || p.Limit > maxPageSize {
-		return Page{}, fmt.Errorf("%w (must be between 1 and %d)", task.ErrInvalidLimit, maxPageSize)
+		return task.Page{}, fmt.Errorf("%w (must be between 1 and %d)", task.ErrInvalidLimit, maxPageSize)
 	}
 	if p.AfterID < 0 {
-		return Page{}, task.ErrInvalidCursor
+		return task.Page{}, task.ErrInvalidCursor
 	}
 	tasks, err := s.store.List(ctx, p.AfterID, p.Limit+1)
 	if err != nil {
-		return Page{}, fmt.Errorf("%w: list tasks after %d: %v", task.ErrUnexpected, p.AfterID, err)
+		return task.Page{}, fmt.Errorf("%w: list tasks after %d: %v", task.ErrUnexpected, p.AfterID, err)
 	}
 	if len(tasks) > p.Limit {
-		return Page{Tasks: tasks[:p.Limit], HasMore: true}, nil
+		return task.Page{Tasks: tasks[:p.Limit], HasMore: true}, nil
 	}
-	return Page{Tasks: tasks}, nil
+	return task.Page{Tasks: tasks}, nil
 }
 
 func (s *Service) Get(ctx context.Context, id int64) (task.Task, error) {
@@ -75,7 +53,7 @@ func (s *Service) Get(ctx context.Context, id int64) (task.Task, error) {
 	return t, nil
 }
 
-func (s *Service) Create(ctx context.Context, in CreateInput) (task.Task, error) {
+func (s *Service) Create(ctx context.Context, in task.CreateInput) (task.Task, error) {
 	name, err := normalizeName(in.Name)
 	if err != nil {
 		return task.Task{}, err
@@ -91,7 +69,7 @@ func (s *Service) Create(ctx context.Context, in CreateInput) (task.Task, error)
 	return t, nil
 }
 
-func (s *Service) Replace(ctx context.Context, id, expectedVersion int64, in ReplaceInput) (task.Task, error) {
+func (s *Service) Replace(ctx context.Context, id, expectedVersion int64, in task.ReplaceInput) (task.Task, error) {
 	name, err := normalizeName(in.Name)
 	if err != nil {
 		return task.Task{}, err

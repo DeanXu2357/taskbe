@@ -5,22 +5,21 @@ import (
 	"errors"
 
 	"github.com/DeanXu2357/taskbe/internal/task"
-	"github.com/DeanXu2357/taskbe/internal/task/service"
 )
 
 var errUnexpectedCall = errors.New("unexpected call")
 
 type fakeService struct {
-	list    func(ctx context.Context, p service.ListParams) (service.Page, error)
+	list    func(ctx context.Context, p task.ListParams) (task.Page, error)
 	get     func(ctx context.Context, id int64) (task.Task, error)
-	create  func(ctx context.Context, in service.CreateInput) (task.Task, error)
-	replace func(ctx context.Context, id, expectedVersion int64, in service.ReplaceInput) (task.Task, error)
+	create  func(ctx context.Context, in task.CreateInput) (task.Task, error)
+	replace func(ctx context.Context, id, expectedVersion int64, in task.ReplaceInput) (task.Task, error)
 	delete  func(ctx context.Context, id int64) error
 }
 
-func (f *fakeService) List(ctx context.Context, p service.ListParams) (service.Page, error) {
+func (f *fakeService) List(ctx context.Context, p task.ListParams) (task.Page, error) {
 	if f.list == nil {
-		return service.Page{}, errUnexpectedCall
+		return task.Page{}, errUnexpectedCall
 	}
 	return f.list(ctx, p)
 }
@@ -32,14 +31,14 @@ func (f *fakeService) Get(ctx context.Context, id int64) (task.Task, error) {
 	return f.get(ctx, id)
 }
 
-func (f *fakeService) Create(ctx context.Context, in service.CreateInput) (task.Task, error) {
+func (f *fakeService) Create(ctx context.Context, in task.CreateInput) (task.Task, error) {
 	if f.create == nil {
 		return task.Task{}, errUnexpectedCall
 	}
 	return f.create(ctx, in)
 }
 
-func (f *fakeService) Replace(ctx context.Context, id, expectedVersion int64, in service.ReplaceInput) (task.Task, error) {
+func (f *fakeService) Replace(ctx context.Context, id, expectedVersion int64, in task.ReplaceInput) (task.Task, error) {
 	if f.replace == nil {
 		return task.Task{}, errUnexpectedCall
 	}

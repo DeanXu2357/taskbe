@@ -173,7 +173,7 @@ service  ──uses──▶  service.Store        ◀──implements──  me
 - `service` applies the business rules: name trimming and length, valid status, timestamps, and paging.
 - `memory` stores the data.
 
-Each interface is declared in the package that uses it. To use a database, write a new `Store` implementation. No other layer changes.
+Each interface is declared in the package that uses it. The types that cross the service boundary (inputs, list parameters, the page, the errors) are in `internal/task`, so `httpapi` does not import `service`. To use a database, write a new `Store` implementation. No other layer changes.
 
 **Explicit error contracts.** `service.Store` declares the errors that a store must return: `ErrRecordNotFound` and `ErrVersionMismatch`. The service translates them into the errors of its own contract in `internal/task`. The service wraps every other store error in `task.ErrUnexpected`. Each handler matches each error with `errors.Is` and writes its own message, so internal error text never reaches the client.
 
@@ -199,7 +199,7 @@ api/openapi.yaml               API contract
 cmd/server/                    entry point: config, wiring, graceful shutdown
 internal/httpapi/              routing, JSON decoding, error mapping, middleware
 internal/logx/                 slog-shaped logger interface for Go 1.18
-internal/task/                 Task, Status and the errors of the service contract
+internal/task/                 Task, Status, service inputs and the service errors
 internal/task/service/         business rules and the Store interface
 internal/task/store/memory/    in-memory Store (map + RWMutex + sorted ids)
 scripts/smoke.sh               builds and runs the Docker image, then calls each endpoint
