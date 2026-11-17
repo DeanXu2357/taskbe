@@ -138,7 +138,8 @@ The server ignores `created_at`, `updated_at` and all unknown fields.
 
 ### `DELETE /tasks/{id}`
 
-Deletes a task. The response is `204` with no body.
+Deletes a task. The response is `204` with no body. If the task does not exist, the response is `404`.
+`DELETE` does not check `version`. It deletes the task whatever its current version is.
 
 ```sh
 curl -i -X DELETE localhost:8080/tasks/1
@@ -173,14 +174,15 @@ service  ──uses──▶  service.Store        ◀──implements──  me
 - `service` applies the business rules: name trimming and length, valid status, timestamps, and paging.
 - `memory` stores the data.
 
-Each interface is declared in the package that uses it. The types that cross the service boundary (inputs, list parameters, the page, the errors) are in `internal/task`, so `httpapi` does not import `service`. To use a database, write a new `Store` implementation. No other layer changes.
+Each interface is declared in the package that uses it. The types that cross the service boundary (the inputs, the list parameters, the page, the default page size and the errors) are in `internal/task`. So `httpapi` does not import `service`. Only `main` and the end-to-end test import it, to connect the real service. To use a database, write a new `Store` implementation. No other layer changes.
 
-**Explicit error contracts.** `service.Store` declares the errors that a store must return: `ErrRecordNotFound` and `ErrVersionMismatch`. The service translates them into the errors of its own contract in `internal/task`. The service wraps every other store error in `task.ErrUnexpected`. Each handler matches each error with `errors.Is` and writes its own message, so internal error text never reaches the client.
+**Explicit error contracts.** `service.Store` declares the errors that a store must return: `ErrRecordNotFound` and `ErrVersionMismatch`. The service translates them into the errors of its own contract in `internal/task`. The service wraps every other store error in `task.ErrUnexpected`. Each handler matches each error with `errors.Is` and writes its own message. Two validation errors also put the text of the service error into the message: a name that is too long and a `limit` that is out of range. For these errors, the service wraps the sentinel with the limit, for example `name is too long (at most 200 characters)`. The limits are unexported constants in `service`, so no other package depends on their values. The text of all other errors, for example a store error, goes only to the server log.
 
 **Optimistic locking on `PUT`.** The exercise only says that `PUT /tasks/{id}` updates a task. A plain overwrite of `name` and `status` silently loses one of two concurrent updates. So each task has a `version`, and a `PUT` must send the version that it read. The store compares the version and writes in one atomic step, the same as `UPDATE ... SET version = version + 1 WHERE id = ? AND version = ?`. A stale version gets `409 Conflict`. The cost is that a `PUT` with only `name` and `status` gets `400 version is required`.
 The version is in the body and not in an `If-Match` header. The `id` is also allowed in the body, and each item of a list already includes its version.
+`DELETE` does not check the version. A delete does not overwrite a change, and a `PUT` after the delete gets `404`, so no update is silently lost. The cost is that a client can delete a task that another client changed after the first client read it.
 
-**`PUT` replaces the whole task.** `name` and `status` are required. The service inputs have no pointers, because the HTTP layer never lets a required field reach the service missing. On `POST`, an omitted status decodes to `0`, which is the documented default.
+**`PUT` replaces the whole task.** `name` and `status` are required. The service inputs, `task.CreateInput` and `task.ReplaceInput`, have no pointers, because the HTTP layer never lets a required field reach the service missing. On `POST`, an omitted status decodes to `0`, which is the documented default.
 
 **Keyset pagination with a default page size.** Without parameters, `GET /tasks` returns the first 20 tasks, not all tasks. A list that has no limit becomes slow and large as the data grows. The cursor is an opaque, base64url-encoded `{"after_id": N}`. A keyset cursor is stable when other requests create or delete tasks, which offset paging is not. If the cursor points to a deleted task, the next page starts after that id. The memory store keeps a sorted slice of ids, so a page is a binary search and not a sort of all tasks.
 
@@ -199,8 +201,8 @@ api/openapi.yaml               API contract
 cmd/server/                    entry point: config, wiring, graceful shutdown
 internal/httpapi/              routing, JSON decoding, error mapping, middleware
 internal/logx/                 slog-shaped logger interface for Go 1.18
-internal/task/                 Task, Status, service inputs and the service errors
-internal/task/service/         business rules and the Store interface
+internal/task/                 Task, Status, and the inputs, outputs and errors of the service
+internal/task/service/         business rules, size limits, the Store interface and its errors
 internal/task/store/memory/    in-memory Store (map + RWMutex + sorted ids)
 scripts/smoke.sh               builds and runs the Docker image, then calls each endpoint
 .github/workflows/ci.yml       tests on Go 1.18 and stable, smoke test of the image
