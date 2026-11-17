@@ -74,7 +74,7 @@ func TestCreateDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("err = %v", err)
 	}
-	want := task.Task{Name: "買早餐", Status: task.StatusIncomplete, CreatedAt: t0, UpdatedAt: t0}
+	want := task.Task{Name: "買早餐", Status: task.StatusIncomplete, Version: 1, CreatedAt: t0, UpdatedAt: t0}
 	if got != want {
 		t.Errorf("store got %+v, want %+v", got, want)
 	}
@@ -106,23 +106,24 @@ func TestCreateValidation(t *testing.T) {
 }
 
 func TestReplace(t *testing.T) {
-	var got task.Task
-	stored := task.Task{ID: 1, Name: "b", Status: task.StatusCompleted, CreatedAt: t0, UpdatedAt: t1}
+	var gotID, gotExpected int64
+	var got service.TaskUpdate
+	stored := task.Task{ID: 1, Name: "b", Status: task.StatusCompleted, Version: 4, CreatedAt: t0, UpdatedAt: t1}
 	svc := service.New(&fakeStore{
-		update: func(_ context.Context, t task.Task) (task.Task, error) {
-			got = t
+		update: func(_ context.Context, id, expectedVersion int64, data service.TaskUpdate) (task.Task, error) {
+			gotID, gotExpected, got = id, expectedVersion, data
 			return stored, nil
 		},
 	}, func() time.Time { return t1 })
 
-	res, err := svc.Replace(context.Background(), 1, service.ReplaceInput{Name: ptr("b"), Status: ptr(task.StatusCompleted)})
+	res, err := svc.Replace(context.Background(), 1, service.ReplaceInput{Name: ptr("b"), Status: ptr(task.StatusCompleted), Version: ptr(int64(3))})
 
 	if err != nil {
 		t.Fatalf("err = %v", err)
 	}
-	want := task.Task{ID: 1, Name: "b", Status: task.StatusCompleted, UpdatedAt: t1}
-	if got != want {
-		t.Errorf("store got %+v, want %+v", got, want)
+	want := service.TaskUpdate{Name: "b", Status: task.StatusCompleted, UpdatedAt: t1}
+	if gotID != 1 || gotExpected != 3 || got != want {
+		t.Errorf("store got id %d, expected version %d, data %+v; want 1, 3, %+v", gotID, gotExpected, got, want)
 	}
 	if res != stored {
 		t.Errorf("result = %+v, want %+v", res, stored)
@@ -138,6 +139,7 @@ func TestReplaceValidation(t *testing.T) {
 		{service.ReplaceInput{Name: ptr("a")}, task.ErrStatusRequired},
 		{service.ReplaceInput{Name: ptr(" "), Status: ptr(task.StatusCompleted)}, task.ErrNameEmpty},
 		{service.ReplaceInput{Name: ptr("a"), Status: ptr(task.Status(2))}, task.ErrInvalidStatus},
+		{service.ReplaceInput{Name: ptr("a"), Status: ptr(task.StatusCompleted)}, task.ErrVersionRequired},
 	}
 	for i, tc := range cases {
 		svc := service.New(&fakeStore{}, func() time.Time { return t1 })
@@ -155,7 +157,7 @@ func TestStoreNotFoundIsTranslated(t *testing.T) {
 		get: func(context.Context, int64) (task.Task, error) {
 			return task.Task{}, service.ErrRecordNotFound
 		},
-		update: func(context.Context, task.Task) (task.Task, error) {
+		update: func(context.Context, int64, int64, service.TaskUpdate) (task.Task, error) {
 			return task.Task{}, service.ErrRecordNotFound
 		},
 		delete: func(context.Context, int64) error {
@@ -167,11 +169,25 @@ func TestStoreNotFoundIsTranslated(t *testing.T) {
 	if _, err := svc.Get(ctx, 1); err != task.ErrNotFound {
 		t.Errorf("Get err = %v, want ErrNotFound", err)
 	}
-	if _, err := svc.Replace(ctx, 1, service.ReplaceInput{Name: ptr("a"), Status: ptr(task.StatusCompleted)}); err != task.ErrNotFound {
+	if _, err := svc.Replace(ctx, 1, service.ReplaceInput{Name: ptr("a"), Status: ptr(task.StatusCompleted), Version: ptr(int64(1))}); err != task.ErrNotFound {
 		t.Errorf("Replace err = %v, want ErrNotFound", err)
 	}
 	if err := svc.Delete(ctx, 1); err != task.ErrNotFound {
 		t.Errorf("Delete err = %v, want ErrNotFound", err)
+	}
+}
+
+func TestStoreVersionMismatchIsTranslated(t *testing.T) {
+	svc := service.New(&fakeStore{
+		update: func(context.Context, int64, int64, service.TaskUpdate) (task.Task, error) {
+			return task.Task{}, service.ErrVersionMismatch
+		},
+	}, func() time.Time { return t1 })
+
+	_, err := svc.Replace(context.Background(), 1, service.ReplaceInput{Name: ptr("a"), Status: ptr(task.StatusCompleted), Version: ptr(int64(1))})
+
+	if err != task.ErrVersionConflict {
+		t.Errorf("err = %v, want ErrVersionConflict", err)
 	}
 }
 
@@ -187,7 +203,7 @@ func TestStoreFailuresAreWrapped(t *testing.T) {
 		create: func(context.Context, task.Task) (task.Task, error) {
 			return task.Task{}, boom
 		},
-		update: func(context.Context, task.Task) (task.Task, error) {
+		update: func(context.Context, int64, int64, service.TaskUpdate) (task.Task, error) {
 			return task.Task{}, boom
 		},
 		delete: func(context.Context, int64) error {
@@ -195,7 +211,7 @@ func TestStoreFailuresAreWrapped(t *testing.T) {
 		},
 	}, func() time.Time { return t1 })
 	ctx := context.Background()
-	valid := service.ReplaceInput{Name: ptr("a"), Status: ptr(task.StatusCompleted)}
+	valid := service.ReplaceInput{Name: ptr("a"), Status: ptr(task.StatusCompleted), Version: ptr(int64(1))}
 
 	_, listErr := svc.List(ctx, service.ListParams{Limit: 20})
 	_, getErr := svc.Get(ctx, 1)

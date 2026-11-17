@@ -36,7 +36,7 @@ func TestCreateTask(t *testing.T) {
 	httpapi.Register(mux, &fakeService{
 		create: func(_ context.Context, in service.CreateInput) (task.Task, error) {
 			got = in
-			return task.Task{ID: 1, Name: "買早餐", Status: task.StatusIncomplete, CreatedAt: t0, UpdatedAt: t0}, nil
+			return task.Task{ID: 1, Name: "買早餐", Status: task.StatusIncomplete, Version: 1, CreatedAt: t0, UpdatedAt: t0}, nil
 		},
 	}, discardLogger)
 
@@ -52,7 +52,7 @@ func TestCreateTask(t *testing.T) {
 		t.Errorf("Content-Type = %q, want application/json", ct)
 	}
 	assertBody(t, rec.Body.String(),
-		`{"data":{"id":1,"name":"買早餐","status":0,"created_at":"2026-11-17T08:00:00Z","updated_at":"2026-11-17T08:00:00Z"}}`)
+		`{"data":{"id":1,"name":"買早餐","status":0,"version":1,"created_at":"2026-11-17T08:00:00Z","updated_at":"2026-11-17T08:00:00Z"}}`)
 	if got.Name == nil || *got.Name != "買早餐" || got.Status != nil {
 		t.Errorf("service got Name=%v Status=%v, want 買早餐 and nil", got.Name, got.Status)
 	}
@@ -87,7 +87,7 @@ func TestCreateTaskDecodesInput(t *testing.T) {
 			t.Errorf("%s: status = %d, want 201", tc.body, rec.Code)
 			continue
 		}
-		if !equalStringPtr(got.Name, tc.wantName) || !equalStatusPtr(got.Status, tc.wantStatus) {
+		if !equalPtr(got.Name, tc.wantName) || !equalPtr(got.Status, tc.wantStatus) {
 			t.Errorf("%s: service got Name=%v Status=%v", tc.body, got.Name, got.Status)
 		}
 	}
@@ -222,8 +222,8 @@ func TestListTasks(t *testing.T) {
 			got = p
 			return service.Page{
 				Tasks: []task.Task{
-					{ID: 1, Name: "買早餐", Status: task.StatusIncomplete, CreatedAt: t0, UpdatedAt: t0},
-					{ID: 2, Name: "買午餐", Status: task.StatusCompleted, CreatedAt: t0, UpdatedAt: t0.Add(time.Hour)},
+					{ID: 1, Name: "買早餐", Status: task.StatusIncomplete, Version: 1, CreatedAt: t0, UpdatedAt: t0},
+					{ID: 2, Name: "買午餐", Status: task.StatusCompleted, Version: 2, CreatedAt: t0, UpdatedAt: t0.Add(time.Hour)},
 				},
 				HasMore: true,
 			}, nil
@@ -240,8 +240,8 @@ func TestListTasks(t *testing.T) {
 	}
 	assertBody(t, rec.Body.String(),
 		`{"data":[`+
-			`{"id":1,"name":"買早餐","status":0,"created_at":"2026-11-17T08:00:00Z","updated_at":"2026-11-17T08:00:00Z"},`+
-			`{"id":2,"name":"買午餐","status":1,"created_at":"2026-11-17T08:00:00Z","updated_at":"2026-11-17T09:00:00Z"}`+
+			`{"id":1,"name":"買早餐","status":0,"version":1,"created_at":"2026-11-17T08:00:00Z","updated_at":"2026-11-17T08:00:00Z"},`+
+			`{"id":2,"name":"買午餐","status":1,"version":2,"created_at":"2026-11-17T08:00:00Z","updated_at":"2026-11-17T09:00:00Z"}`+
 			`],"next_cursor":"eyJhZnRlcl9pZCI6Mn0"}`)
 }
 
@@ -325,14 +325,7 @@ func TestListRejectsQuery(t *testing.T) {
 	}
 }
 
-func equalStringPtr(a, b *string) bool {
-	if a == nil || b == nil {
-		return a == b
-	}
-	return *a == *b
-}
-
-func equalStatusPtr(a, b *task.Status) bool {
+func equalPtr[T comparable](a, b *T) bool {
 	if a == nil || b == nil {
 		return a == b
 	}

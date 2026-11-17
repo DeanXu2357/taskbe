@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/DeanXu2357/taskbe/internal/task"
+	"github.com/DeanXu2357/taskbe/internal/task/service"
 )
 
 type Store struct{}
@@ -24,7 +25,7 @@ func (s *Store) Create(ctx context.Context, t task.Task) (task.Task, error) {
 	return task.Task{}, task.ErrNotImplemented
 }
 
-func (s *Store) Update(ctx context.Context, t task.Task) (task.Task, error) {
+func (s *Store) Update(ctx context.Context, id, expectedVersion int64, data service.TaskUpdate) (task.Task, error) {
 	return task.Task{}, task.ErrNotImplemented
 }
 

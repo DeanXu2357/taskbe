@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/DeanXu2357/taskbe/internal/task"
+	"github.com/DeanXu2357/taskbe/internal/task/service"
 )
 
 var errUnexpectedCall = errors.New("unexpected call")
@@ -13,7 +14,7 @@ type fakeStore struct {
 	list   func(ctx context.Context, afterID int64, limit int) ([]task.Task, error)
 	get    func(ctx context.Context, id int64) (task.Task, error)
 	create func(ctx context.Context, t task.Task) (task.Task, error)
-	update func(ctx context.Context, t task.Task) (task.Task, error)
+	update func(ctx context.Context, id, expectedVersion int64, data service.TaskUpdate) (task.Task, error)
 	delete func(ctx context.Context, id int64) error
 }
 
@@ -38,11 +39,11 @@ func (f *fakeStore) Create(ctx context.Context, t task.Task) (task.Task, error) 
 	return f.create(ctx, t)
 }
 
-func (f *fakeStore) Update(ctx context.Context, t task.Task) (task.Task, error) {
+func (f *fakeStore) Update(ctx context.Context, id, expectedVersion int64, data service.TaskUpdate) (task.Task, error) {
 	if f.update == nil {
 		return task.Task{}, errUnexpectedCall
 	}
-	return f.update(ctx, t)
+	return f.update(ctx, id, expectedVersion, data)
 }
 
 func (f *fakeStore) Delete(ctx context.Context, id int64) error {

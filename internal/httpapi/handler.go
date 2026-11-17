@@ -182,7 +182,7 @@ func (h *handler) replaceTask(w http.ResponseWriter, r *http.Request, id int64) 
 		return
 	}
 
-	t, err := h.svc.Replace(r.Context(), id, service.ReplaceInput{Name: req.Name, Status: req.Status})
+	t, err := h.svc.Replace(r.Context(), id, service.ReplaceInput{Name: req.Name, Status: req.Status, Version: req.Version})
 	if err != nil {
 		switch {
 		case errors.Is(err, task.ErrNameRequired):
@@ -195,8 +195,12 @@ func (h *handler) replaceTask(w http.ResponseWriter, r *http.Request, id int64) 
 			writeError(w, http.StatusBadRequest, codeValidationFailed, "status is required")
 		case errors.Is(err, task.ErrInvalidStatus):
 			writeError(w, http.StatusBadRequest, codeValidationFailed, "status must be 0 or 1")
+		case errors.Is(err, task.ErrVersionRequired):
+			writeError(w, http.StatusBadRequest, codeValidationFailed, "version is required")
 		case errors.Is(err, task.ErrNotFound):
 			writeError(w, http.StatusNotFound, codeNotFound, "task not found")
+		case errors.Is(err, task.ErrVersionConflict):
+			writeError(w, http.StatusConflict, codeConflict, "version does not match the current task")
 		case errors.Is(err, task.ErrNotImplemented):
 			writeNotImplemented(w)
 		case errors.Is(err, task.ErrUnexpected):

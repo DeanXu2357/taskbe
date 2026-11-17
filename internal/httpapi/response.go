@@ -15,6 +15,7 @@ const (
 	codeValidationFailed errorCode = "validation_failed"
 	codeNotFound         errorCode = "not_found"
 	codeMethodNotAllowed errorCode = "method_not_allowed"
+	codeConflict         errorCode = "conflict"
 	codePayloadTooLarge  errorCode = "payload_too_large"
 	codeInternalError    errorCode = "internal_error"
 	codeNotImplemented   errorCode = "not_implemented"
@@ -61,6 +62,7 @@ type taskResponse struct {
 	ID        int64     `json:"id"`
 	Name      string    `json:"name"`
 	Status    int       `json:"status"`
+	Version   int64     `json:"version"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -70,6 +72,7 @@ func toTaskResponse(t task.Task) taskResponse {
 		ID:        t.ID,
 		Name:      t.Name,
 		Status:    int(t.Status),
+		Version:   t.Version,
 		CreatedAt: t.CreatedAt.UTC(),
 		UpdatedAt: t.UpdatedAt.UTC(),
 	}

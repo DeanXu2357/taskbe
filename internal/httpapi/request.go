@@ -25,9 +25,10 @@ type createTaskRequest struct {
 }
 
 type replaceTaskRequest struct {
-	ID     *int64       `json:"id"`
-	Name   *string      `json:"name"`
-	Status *task.Status `json:"status"`
+	ID      *int64       `json:"id"`
+	Name    *string      `json:"name"`
+	Status  *task.Status `json:"status"`
+	Version *int64       `json:"version"`
 }
 
 func decodeJSON(r *http.Request, dst any) *requestError {

@@ -60,11 +60,13 @@ paths:
                       - id: 1
                         name: 買早餐
                         status: 0
+                        version: 1
                         created_at: "2026-11-17T08:00:00Z"
                         updated_at: "2026-11-17T08:00:00Z"
                       - id: 2
                         name: 買午餐
                         status: 1
+                        version: 2
                         created_at: "2026-11-17T08:05:00Z"
                         updated_at: "2026-11-17T09:00:00Z"
                     next_cursor: eyJhZnRlcl9pZCI6Mn0
@@ -114,6 +116,7 @@ paths:
                   id: 1
                   name: 買早餐
                   status: 0
+                  version: 1
                   created_at: "2026-11-17T08:00:00Z"
                   updated_at: "2026-11-17T08:00:00Z"
         "400":
@@ -155,7 +158,10 @@ paths:
       summary: Replace a task
       description: |
         Replaces the whole task, so `name` and `status` are both required.
-        `created_at` is kept and `updated_at` is set to the current time.
+        `version` must be the version the client last read; if the task has
+        been changed since, the request fails with 409 and nothing is
+        written. On success `version` increases by 1, `created_at` is kept
+        and `updated_at` is set to the current time.
       requestBody:
         required: true
         content:
@@ -165,6 +171,7 @@ paths:
             example:
               name: 買午餐
               status: 1
+              version: 1
       responses:
         "200":
           description: The updated task.
@@ -177,12 +184,15 @@ paths:
                   id: 1
                   name: 買午餐
                   status: 1
+                  version: 2
                   created_at: "2026-11-17T08:00:00Z"
                   updated_at: "2026-11-17T09:00:00Z"
         "400":
           $ref: "#/components/responses/BadRequest"
         "404":
           $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
         "413":
           $ref: "#/components/responses/PayloadTooLarge"
         "500":
@@ -213,7 +223,7 @@ components:
         validation and storage; the result must be 1 to 200 characters.
     Task:
       type: object
-      required: [id, name, status, created_at, updated_at]
+      required: [id, name, status, version, created_at, updated_at]
       properties:
         id:
           type: integer
@@ -224,6 +234,11 @@ components:
           $ref: "#/components/schemas/TaskName"
         status:
           $ref: "#/components/schemas/TaskStatus"
+        version:
+          type: integer
+          format: int64
+          minimum: 1
+          description: 1 when created, increased by 1 on every replace.
         created_at:
           type: string
           format: date-time
@@ -246,7 +261,7 @@ components:
           description: Optional. Omitted or null means 0.
     ReplaceTaskRequest:
       type: object
-      required: [name, status]
+      required: [name, status, version]
       properties:
         id:
           type: integer
@@ -256,6 +271,10 @@ components:
           $ref: "#/components/schemas/TaskName"
         status:
           $ref: "#/components/schemas/TaskStatus"
+        version:
+          type: integer
+          format: int64
+          description: The version the client last read. It must equal the current version.
     TaskResponse:
       type: object
       required: [data]
@@ -289,6 +308,7 @@ components:
                 - validation_failed
                 - not_found
                 - method_not_allowed
+                - conflict
                 - payload_too_large
                 - internal_error
             message:
@@ -298,8 +318,8 @@ components:
       description: |
         `invalid_json` when the body is empty, is not a JSON object, has a
         field of the wrong type or is not valid JSON. `validation_failed`
-        when a field is missing or has an invalid value, or when the body
-        `id` does not match the path.
+        when a field (including `version` on replace) is missing or has an
+        invalid value, or when the body `id` does not match the path.
       content:
         application/json:
           schema:
@@ -325,6 +345,16 @@ components:
             error:
               code: not_found
               message: task not found
+    Conflict:
+      description: The `version` in the request does not match the current version of the task.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: conflict
+              message: version does not match the current task
     PayloadTooLarge:
       description: The request body exceeds 1 MiB.
       content:

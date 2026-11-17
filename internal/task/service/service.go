@@ -31,8 +31,9 @@ type CreateInput struct {
 }
 
 type ReplaceInput struct {
-	Name   *string
-	Status *task.Status
+	Name    *string
+	Status  *task.Status
+	Version *int64
 }
 
 type ListParams struct {
@@ -89,7 +90,7 @@ func (s *Service) Create(ctx context.Context, in CreateInput) (task.Task, error)
 		return task.Task{}, task.ErrInvalidStatus
 	}
 	now := s.now().UTC()
-	t, err := s.store.Create(ctx, task.Task{Name: name, Status: status, CreatedAt: now, UpdatedAt: now})
+	t, err := s.store.Create(ctx, task.Task{Name: name, Status: status, Version: 1, CreatedAt: now, UpdatedAt: now})
 	if err != nil {
 		return task.Task{}, fmt.Errorf("%w: create task: %v", task.ErrUnexpected, err)
 	}
@@ -110,10 +111,16 @@ func (s *Service) Replace(ctx context.Context, id int64, in ReplaceInput) (task.
 	if !in.Status.Valid() {
 		return task.Task{}, task.ErrInvalidStatus
 	}
-	t, err := s.store.Update(ctx, task.Task{ID: id, Name: name, Status: *in.Status, UpdatedAt: s.now().UTC()})
+	if in.Version == nil {
+		return task.Task{}, task.ErrVersionRequired
+	}
+	t, err := s.store.Update(ctx, id, *in.Version, TaskUpdate{Name: name, Status: *in.Status, UpdatedAt: s.now().UTC()})
 	if err != nil {
 		if errors.Is(err, ErrRecordNotFound) {
 			return task.Task{}, task.ErrNotFound
+		}
+		if errors.Is(err, ErrVersionMismatch) {
+			return task.Task{}, task.ErrVersionConflict
 		}
 		return task.Task{}, fmt.Errorf("%w: replace task %d: %v", task.ErrUnexpected, id, err)
 	}
