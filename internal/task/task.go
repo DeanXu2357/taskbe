@@ -35,5 +35,6 @@ var (
 	ErrInvalidStatus  = errors.New("status must be 0 or 1")
 	ErrInvalidLimit   = errors.New("limit must be between 1 and 100")
 	ErrInvalidCursor  = errors.New("cursor is invalid")
+	ErrUnexpected     = errors.New("unexpected error")
 	ErrNotImplemented = errors.New("not implemented")
 )
