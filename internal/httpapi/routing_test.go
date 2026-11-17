@@ -2,15 +2,12 @@ package httpapi_test
 
 import (
 	"encoding/json"
-	"io"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/DeanXu2357/taskbe/internal/httpapi"
-	"github.com/DeanXu2357/taskbe/internal/logx"
 )
 
 type errorBody struct {
@@ -27,10 +24,6 @@ func do(h http.Handler, method, target, body string) *httptest.ResponseRecorder 
 	return rec
 }
 
-func newSkeletonAPI() http.Handler {
-	return httpapi.New(&fakeService{}, logx.New(log.New(io.Discard, "", 0)))
-}
-
 func decodeError(t *testing.T, rec *httptest.ResponseRecorder) errorBody {
 	t.Helper()
 	if ct := rec.Header().Get("Content-Type"); ct != "application/json" {
@@ -44,7 +37,8 @@ func decodeError(t *testing.T, rec *httptest.ResponseRecorder) errorBody {
 }
 
 func TestMethodNotAllowed(t *testing.T) {
-	h := newSkeletonAPI()
+	mux := http.NewServeMux()
+	httpapi.Register(mux, &fakeService{}, discardLogger)
 	cases := []struct{ method, target, allow string }{
 		{http.MethodPut, "/tasks", "GET, POST"},
 		{http.MethodDelete, "/tasks", "GET, POST"},
@@ -53,7 +47,7 @@ func TestMethodNotAllowed(t *testing.T) {
 		{http.MethodPatch, "/tasks/1", "GET, PUT, DELETE"},
 	}
 	for _, tc := range cases {
-		rec := do(h, tc.method, tc.target, "")
+		rec := do(mux, tc.method, tc.target, "")
 		if rec.Code != http.StatusMethodNotAllowed {
 			t.Errorf("%s %s: status = %d, want 405", tc.method, tc.target, rec.Code)
 			continue
@@ -68,7 +62,8 @@ func TestMethodNotAllowed(t *testing.T) {
 }
 
 func TestInvalidTaskPaths(t *testing.T) {
-	h := newSkeletonAPI()
+	mux := http.NewServeMux()
+	httpapi.Register(mux, &fakeService{}, discardLogger)
 	paths := []string{
 		"/tasks/",
 		"/tasks/abc",
@@ -81,7 +76,7 @@ func TestInvalidTaskPaths(t *testing.T) {
 		"/tasks/99999999999999999999",
 	}
 	for _, p := range paths {
-		rec := do(h, http.MethodGet, p, "")
+		rec := do(mux, http.MethodGet, p, "")
 		if rec.Code != http.StatusNotFound {
 			t.Errorf("GET %s: status = %d, want 404", p, rec.Code)
 			continue
@@ -93,9 +88,10 @@ func TestInvalidTaskPaths(t *testing.T) {
 }
 
 func TestUnknownPath(t *testing.T) {
-	h := newSkeletonAPI()
+	mux := http.NewServeMux()
+	httpapi.Register(mux, &fakeService{}, discardLogger)
 	for _, p := range []string{"/", "/foo"} {
-		rec := do(h, http.MethodGet, p, "")
+		rec := do(mux, http.MethodGet, p, "")
 		if rec.Code != http.StatusNotFound {
 			t.Errorf("GET %s: status = %d, want 404", p, rec.Code)
 			continue

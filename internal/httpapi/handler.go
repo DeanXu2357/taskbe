@@ -19,15 +19,13 @@ type handler struct {
 	logger logx.Logger
 }
 
-func New(svc TaskService, logger logx.Logger) http.Handler {
+func Register(mux *http.ServeMux, svc TaskService, logger logx.Logger) {
 	h := &handler{svc: svc, logger: logger}
-	mux := http.NewServeMux()
 	mux.HandleFunc("/tasks", h.collection)
 	mux.HandleFunc(taskPathPrefix, h.item)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, codeNotFound, "resource not found")
 	})
-	return mux
 }
 
 func (h *handler) collection(w http.ResponseWriter, r *http.Request) {

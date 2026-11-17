@@ -22,9 +22,11 @@ func main() {
 
 	store := memory.New()
 	svc := service.New(store, time.Now)
+	mux := http.NewServeMux()
+	httpapi.Register(mux, svc, logger)
 	srv := &http.Server{
 		Addr:              ":8080",
-		Handler:           httpapi.New(svc, logger),
+		Handler:           mux,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 

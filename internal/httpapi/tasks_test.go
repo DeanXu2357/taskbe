@@ -20,9 +20,7 @@ import (
 
 var t0 = time.Date(2026, 11, 17, 8, 0, 0, 0, time.UTC)
 
-func newAPI(svc *fakeService) http.Handler {
-	return httpapi.New(svc, logx.New(log.New(io.Discard, "", 0)))
-}
+var discardLogger = logx.New(log.New(io.Discard, "", 0))
 
 func assertBody(t *testing.T, got, want string) {
 	t.Helper()
@@ -33,14 +31,15 @@ func assertBody(t *testing.T, got, want string) {
 
 func TestCreateTask(t *testing.T) {
 	var got service.CreateInput
-	h := newAPI(&fakeService{
+	mux := http.NewServeMux()
+	httpapi.Register(mux, &fakeService{
 		create: func(_ context.Context, in service.CreateInput) (task.Task, error) {
 			got = in
 			return task.Task{ID: 1, Name: "買早餐", Status: task.StatusIncomplete, CreatedAt: t0, UpdatedAt: t0}, nil
 		},
-	})
+	}, discardLogger)
 
-	rec := do(h, http.MethodPost, "/tasks", `{"name":"買早餐"}`)
+	rec := do(mux, http.MethodPost, "/tasks", `{"name":"買早餐"}`)
 
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("status = %d, want 201", rec.Code)
@@ -73,14 +72,15 @@ func TestCreateTaskDecodesInput(t *testing.T) {
 	}
 	for _, tc := range cases {
 		var got service.CreateInput
-		h := newAPI(&fakeService{
+		mux := http.NewServeMux()
+		httpapi.Register(mux, &fakeService{
 			create: func(_ context.Context, in service.CreateInput) (task.Task, error) {
 				got = in
 				return task.Task{ID: 1}, nil
 			},
-		})
+		}, discardLogger)
 
-		rec := do(h, http.MethodPost, "/tasks", tc.body)
+		rec := do(mux, http.MethodPost, "/tasks", tc.body)
 
 		if rec.Code != http.StatusCreated {
 			t.Errorf("%s: status = %d, want 201", tc.body, rec.Code)
@@ -110,14 +110,15 @@ func TestCreateTaskRejectsBody(t *testing.T) {
 	}
 	for _, tc := range cases {
 		called := false
-		h := newAPI(&fakeService{
+		mux := http.NewServeMux()
+		httpapi.Register(mux, &fakeService{
 			create: func(context.Context, service.CreateInput) (task.Task, error) {
 				called = true
 				return task.Task{}, nil
 			},
-		})
+		}, discardLogger)
 
-		rec := do(h, http.MethodPost, "/tasks", tc.body)
+		rec := do(mux, http.MethodPost, "/tasks", tc.body)
 
 		label := tc.body
 		if len(label) > 40 {
@@ -158,13 +159,14 @@ func TestCreateTaskServiceErrors(t *testing.T) {
 	for _, tc := range cases {
 		err := tc.err
 		t.Run(err.Error(), func(t *testing.T) {
-			h := newAPI(&fakeService{
+			mux := http.NewServeMux()
+			httpapi.Register(mux, &fakeService{
 				create: func(context.Context, service.CreateInput) (task.Task, error) {
 					return task.Task{}, err
 				},
-			})
+			}, discardLogger)
 
-			rec := do(h, http.MethodPost, "/tasks", `{"name":"a"}`)
+			rec := do(mux, http.MethodPost, "/tasks", `{"name":"a"}`)
 
 			assertServiceError(t, rec, tc.wantStatus, tc.wantCode)
 		})
@@ -185,13 +187,14 @@ func TestListTasksServiceErrors(t *testing.T) {
 	for _, tc := range cases {
 		err := tc.err
 		t.Run(err.Error(), func(t *testing.T) {
-			h := newAPI(&fakeService{
+			mux := http.NewServeMux()
+			httpapi.Register(mux, &fakeService{
 				list: func(context.Context, service.ListParams) (service.Page, error) {
 					return service.Page{}, err
 				},
-			})
+			}, discardLogger)
 
-			rec := do(h, http.MethodGet, "/tasks", "")
+			rec := do(mux, http.MethodGet, "/tasks", "")
 
 			assertServiceError(t, rec, tc.wantStatus, tc.wantCode)
 		})
@@ -210,7 +213,8 @@ func assertServiceError(t *testing.T, rec *httptest.ResponseRecorder, wantStatus
 
 func TestListTasks(t *testing.T) {
 	var got service.ListParams
-	h := newAPI(&fakeService{
+	mux := http.NewServeMux()
+	httpapi.Register(mux, &fakeService{
 		list: func(_ context.Context, p service.ListParams) (service.Page, error) {
 			got = p
 			return service.Page{
@@ -221,9 +225,9 @@ func TestListTasks(t *testing.T) {
 				HasMore: true,
 			}, nil
 		},
-	})
+	}, discardLogger)
 
-	rec := do(h, http.MethodGet, "/tasks", "")
+	rec := do(mux, http.MethodGet, "/tasks", "")
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", rec.Code)
@@ -239,13 +243,14 @@ func TestListTasks(t *testing.T) {
 }
 
 func TestListLastPage(t *testing.T) {
-	h := newAPI(&fakeService{
+	mux := http.NewServeMux()
+	httpapi.Register(mux, &fakeService{
 		list: func(context.Context, service.ListParams) (service.Page, error) {
 			return service.Page{Tasks: nil, HasMore: false}, nil
 		},
-	})
+	}, discardLogger)
 
-	rec := do(h, http.MethodGet, "/tasks", "")
+	rec := do(mux, http.MethodGet, "/tasks", "")
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", rec.Code)
@@ -263,14 +268,15 @@ func TestListParsesQuery(t *testing.T) {
 	}
 	for _, tc := range cases {
 		var got service.ListParams
-		h := newAPI(&fakeService{
+		mux := http.NewServeMux()
+		httpapi.Register(mux, &fakeService{
 			list: func(_ context.Context, p service.ListParams) (service.Page, error) {
 				got = p
 				return service.Page{}, nil
 			},
-		})
+		}, discardLogger)
 
-		rec := do(h, http.MethodGet, tc.target, "")
+		rec := do(mux, http.MethodGet, tc.target, "")
 
 		if rec.Code != http.StatusOK {
 			t.Errorf("%s: status = %d, want 200", tc.target, rec.Code)
@@ -293,14 +299,15 @@ func TestListRejectsQuery(t *testing.T) {
 	}
 	for _, q := range queries {
 		called := false
-		h := newAPI(&fakeService{
+		mux := http.NewServeMux()
+		httpapi.Register(mux, &fakeService{
 			list: func(context.Context, service.ListParams) (service.Page, error) {
 				called = true
 				return service.Page{}, nil
 			},
-		})
+		}, discardLogger)
 
-		rec := do(h, http.MethodGet, "/tasks?"+q, "")
+		rec := do(mux, http.MethodGet, "/tasks?"+q, "")
 
 		if rec.Code != http.StatusBadRequest {
 			t.Errorf("%s: status = %d, want 400", q, rec.Code)

@@ -7,20 +7,22 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DeanXu2357/taskbe/internal/httpapi"
 	"github.com/DeanXu2357/taskbe/internal/task"
 	"github.com/DeanXu2357/taskbe/internal/task/service"
 )
 
 func TestGetTask(t *testing.T) {
 	var gotID int64
-	h := newAPI(&fakeService{
+	mux := http.NewServeMux()
+	httpapi.Register(mux, &fakeService{
 		get: func(_ context.Context, id int64) (task.Task, error) {
 			gotID = id
 			return task.Task{ID: 1, Name: "買早餐", Status: task.StatusCompleted, CreatedAt: t0, UpdatedAt: t0}, nil
 		},
-	})
+	}, discardLogger)
 
-	rec := do(h, http.MethodGet, "/tasks/1", "")
+	rec := do(mux, http.MethodGet, "/tasks/1", "")
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", rec.Code)
@@ -48,13 +50,14 @@ func TestGetTaskServiceErrors(t *testing.T) {
 	for _, tc := range cases {
 		err := tc.err
 		t.Run(err.Error(), func(t *testing.T) {
-			h := newAPI(&fakeService{
+			mux := http.NewServeMux()
+			httpapi.Register(mux, &fakeService{
 				get: func(context.Context, int64) (task.Task, error) {
 					return task.Task{}, err
 				},
-			})
+			}, discardLogger)
 
-			rec := do(h, http.MethodGet, "/tasks/1", "")
+			rec := do(mux, http.MethodGet, "/tasks/1", "")
 
 			assertServiceError(t, rec, tc.wantStatus, tc.wantCode)
 		})
@@ -64,14 +67,15 @@ func TestGetTaskServiceErrors(t *testing.T) {
 func TestReplaceTask(t *testing.T) {
 	var gotID int64
 	var got service.ReplaceInput
-	h := newAPI(&fakeService{
+	mux := http.NewServeMux()
+	httpapi.Register(mux, &fakeService{
 		replace: func(_ context.Context, id int64, in service.ReplaceInput) (task.Task, error) {
 			gotID, got = id, in
 			return task.Task{ID: 1, Name: "買午餐", Status: task.StatusCompleted, CreatedAt: t0, UpdatedAt: t0.Add(time.Second)}, nil
 		},
-	})
+	}, discardLogger)
 
-	rec := do(h, http.MethodPut, "/tasks/1", `{"name":"買午餐","status":1}`)
+	rec := do(mux, http.MethodPut, "/tasks/1", `{"name":"買午餐","status":1}`)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", rec.Code)
@@ -99,14 +103,15 @@ func TestReplaceTaskBodyID(t *testing.T) {
 	}
 	for _, tc := range cases {
 		called := false
-		h := newAPI(&fakeService{
+		mux := http.NewServeMux()
+		httpapi.Register(mux, &fakeService{
 			replace: func(context.Context, int64, service.ReplaceInput) (task.Task, error) {
 				called = true
 				return task.Task{ID: 1, Name: "a", Status: task.StatusCompleted, CreatedAt: t0, UpdatedAt: t0}, nil
 			},
-		})
+		}, discardLogger)
 
-		rec := do(h, http.MethodPut, "/tasks/1", tc.body)
+		rec := do(mux, http.MethodPut, "/tasks/1", tc.body)
 
 		if rec.Code != tc.wantStatus {
 			t.Errorf("%s: status = %d, want %d", tc.body, rec.Code, tc.wantStatus)
@@ -135,14 +140,15 @@ func TestReplaceTaskDecodesInput(t *testing.T) {
 	}
 	for _, tc := range cases {
 		var got service.ReplaceInput
-		h := newAPI(&fakeService{
+		mux := http.NewServeMux()
+		httpapi.Register(mux, &fakeService{
 			replace: func(_ context.Context, _ int64, in service.ReplaceInput) (task.Task, error) {
 				got = in
 				return task.Task{ID: 1}, nil
 			},
-		})
+		}, discardLogger)
 
-		do(h, http.MethodPut, "/tasks/1", tc.body)
+		do(mux, http.MethodPut, "/tasks/1", tc.body)
 
 		if !equalStringPtr(got.Name, tc.wantName) || !equalStatusPtr(got.Status, tc.wantStatus) {
 			t.Errorf("%s: service got Name=%v Status=%v", tc.body, got.Name, got.Status)
@@ -152,14 +158,15 @@ func TestReplaceTaskDecodesInput(t *testing.T) {
 
 func TestReplaceTaskRejectsBody(t *testing.T) {
 	called := false
-	h := newAPI(&fakeService{
+	mux := http.NewServeMux()
+	httpapi.Register(mux, &fakeService{
 		replace: func(context.Context, int64, service.ReplaceInput) (task.Task, error) {
 			called = true
 			return task.Task{}, nil
 		},
-	})
+	}, discardLogger)
 
-	rec := do(h, http.MethodPut, "/tasks/1", "{")
+	rec := do(mux, http.MethodPut, "/tasks/1", "{")
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400", rec.Code)
@@ -190,13 +197,14 @@ func TestReplaceTaskServiceErrors(t *testing.T) {
 	for _, tc := range cases {
 		err := tc.err
 		t.Run(err.Error(), func(t *testing.T) {
-			h := newAPI(&fakeService{
+			mux := http.NewServeMux()
+			httpapi.Register(mux, &fakeService{
 				replace: func(context.Context, int64, service.ReplaceInput) (task.Task, error) {
 					return task.Task{}, err
 				},
-			})
+			}, discardLogger)
 
-			rec := do(h, http.MethodPut, "/tasks/1", `{"name":"a","status":1}`)
+			rec := do(mux, http.MethodPut, "/tasks/1", `{"name":"a","status":1}`)
 
 			assertServiceError(t, rec, tc.wantStatus, tc.wantCode)
 		})
@@ -205,14 +213,15 @@ func TestReplaceTaskServiceErrors(t *testing.T) {
 
 func TestDeleteTask(t *testing.T) {
 	var gotID int64
-	h := newAPI(&fakeService{
+	mux := http.NewServeMux()
+	httpapi.Register(mux, &fakeService{
 		delete: func(_ context.Context, id int64) error {
 			gotID = id
 			return nil
 		},
-	})
+	}, discardLogger)
 
-	rec := do(h, http.MethodDelete, "/tasks/1", "")
+	rec := do(mux, http.MethodDelete, "/tasks/1", "")
 
 	if rec.Code != http.StatusNoContent {
 		t.Fatalf("status = %d, want 204", rec.Code)
@@ -238,13 +247,14 @@ func TestDeleteTaskServiceErrors(t *testing.T) {
 	for _, tc := range cases {
 		err := tc.err
 		t.Run(err.Error(), func(t *testing.T) {
-			h := newAPI(&fakeService{
+			mux := http.NewServeMux()
+			httpapi.Register(mux, &fakeService{
 				delete: func(context.Context, int64) error {
 					return err
 				},
-			})
+			}, discardLogger)
 
-			rec := do(h, http.MethodDelete, "/tasks/1", "")
+			rec := do(mux, http.MethodDelete, "/tasks/1", "")
 
 			assertServiceError(t, rec, tc.wantStatus, tc.wantCode)
 		})
